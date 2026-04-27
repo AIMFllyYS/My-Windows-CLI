@@ -5,7 +5,7 @@ import { MODELS, DEFAULT_MODEL_ID, getModelById } from './models';
 import { streamChat } from './provider';
 import { webSearch } from './search';
 import { executeTool, getSystemPrompt, isToolCommand } from './tools';
-import { Spinner, renderMarkdown, drawBox, printSuccess, printError, printInfo, printWarning, printDivider } from './renderer';
+import { Spinner, drawBox, printSuccess, printError, printInfo, printWarning, printDivider, StreamRenderer } from './renderer';
 import { interactiveSelect } from '../utils/selector';
 
 export async function startChat(modelId?: string): Promise<void> {
@@ -52,63 +52,13 @@ export async function startChat(modelId?: string): Promise<void> {
     // === Web Search (prefix: search / 搜索) ===
     if (/^(search|搜索)\s+/i.test(input)) {
       const query = input.replace(/^(search|搜索)\s+/i, '');
-      await doSearch(query);
+      await doSearch(query, messages, currentModel);
       continue;
     }
 
     // === AI Chat ===
     messages.push({ role: 'user', content: input });
-
-    const spinner = new Spinner('AI 思考中');
-    spinner.start();
-
-    try {
-      const response = await new Promise<string>((resolve, reject) => {
-        let reasoningText = '';
-        let reasoningStarted = false;
-
-        streamChat(messages, currentModel, {
-          onToken: (token) => {
-            // Collect silently - we render the full response at the end
-            // Update spinner to show progress
-            spinner.setText('AI 生成中');
-          },
-          onReasoning: (token) => {
-            if (!reasoningStarted) {
-              spinner.stop();
-              console.log(chalk.gray('\n  💭 思考过程:'));
-              reasoningStarted = true;
-            }
-            process.stdout.write(chalk.gray(token));
-            reasoningText += token;
-          },
-          onDone: (full) => {
-            spinner.stop();
-            // End reasoning section if it was shown
-            if (reasoningStarted) {
-              console.log('');
-              printDivider();
-            }
-            // Render the full response with markdown formatting
-            console.log(chalk.bold.green('\n  AI '));
-            printDivider();
-            console.log(renderMarkdown(full));
-            printDivider();
-            resolve(full);
-          },
-          onError: (err) => {
-            spinner.stop();
-            reject(err);
-          },
-        });
-      });
-
-      messages.push({ role: 'assistant', content: response });
-    } catch (e: any) {
-      spinner.stop();
-      printError('API 错误: ' + e.message);
-      messages.pop(); // remove failed user message
-    }
+    await streamAIResponse(messages, currentModel);
   }
 
   rl.close();
@@ -157,7 +107,7 @@ async function handleCommand(
       if (!args) {
         printWarning('用法: /search <查询内容>');
       } else {
-        await doSearch(args);
+        await doSearch(args, messages, currentModel);
       }
       return 'continue';
 
@@ -241,7 +191,7 @@ function printModelInfo(model: ModelInfo): void {
   console.log('');
 }
 
-async function doSearch(query: string): Promise<void> {
+async function doSearch(query: string, messages: ChatMessage[], model: ModelInfo): Promise<void> {
   const spinner = new Spinner('搜索中');
   spinner.start();
   try {
@@ -251,21 +201,81 @@ async function doSearch(query: string): Promise<void> {
     printDivider();
     if (!results.length) {
       printWarning('未找到相关结果');
-    } else {
-      results.forEach((r, i) => {
-        const date = r.publish_date ? chalk.gray(` (${r.publish_date})`) : '';
-        console.log(chalk.cyan(`  [${i + 1}] `) + chalk.bold.white(r.title) + date);
-        if (r.media) console.log(chalk.gray('      来源: ' + r.media));
-        const snippet = r.content.slice(0, 150) + (r.content.length > 150 ? '...' : '');
-        console.log(chalk.white('      ' + snippet));
-        console.log(chalk.blue.underline('      ' + r.link));
-        console.log('');
-      });
+      return;
     }
+    results.forEach((r, i) => {
+      const date = r.publish_date ? chalk.gray(` (${r.publish_date})`) : '';
+      console.log(chalk.cyan(`  [${i + 1}] `) + chalk.bold.white(r.title) + date);
+      if (r.media) console.log(chalk.gray('      来源: ' + r.media));
+      const snippet = r.content.slice(0, 150) + (r.content.length > 150 ? '...' : '');
+      console.log(chalk.white('      ' + snippet));
+      console.log('');
+    });
     printDivider();
+
+    // Inject search results into conversation so AI can see them
+    const aiContent = results.map((r, i) =>
+      `[${i + 1}] ${r.title}${r.publish_date ? ` (${r.publish_date})` : ''}\n${r.content}\n来源: ${r.link}`
+    ).join('\n\n');
+
+    messages.push({
+      role: 'user',
+      content: `我搜索了「${query}」，以下是搜索结果：\n\n${aiContent}\n\n请根据以上搜索结果进行总结分析。`
+    });
+
+    // Auto-trigger AI to summarize
+    await streamAIResponse(messages, model);
   } catch (e: any) {
     spinner.stop();
     printError('搜索失败: ' + e.message);
+  }
+}
+
+/** Shared streaming AI response handler */
+async function streamAIResponse(messages: ChatMessage[], model: ModelInfo): Promise<void> {
+  const spinner = new Spinner('AI 思考中');
+  spinner.start();
+
+  try {
+    const response = await new Promise<string>((resolve, reject) => {
+      let reasoningStarted = false;
+      const renderer = new StreamRenderer();
+
+      streamChat(messages, model, {
+        onToken: (token) => {
+          if (spinner.isRunning()) spinner.stop();
+          renderer.push(token);
+        },
+        onReasoning: (token) => {
+          if (!reasoningStarted) {
+            spinner.stop();
+            console.log(chalk.gray('\n  💭 思考过程:'));
+            reasoningStarted = true;
+          }
+          process.stdout.write(chalk.gray(token));
+        },
+        onDone: (full) => {
+          spinner.stop();
+          if (reasoningStarted) {
+            console.log('');
+            printDivider();
+          }
+          renderer.finish();
+          printDivider();
+          resolve(full);
+        },
+        onError: (err) => {
+          spinner.stop();
+          reject(err);
+        },
+      });
+    });
+
+    messages.push({ role: 'assistant', content: response });
+  } catch (e: any) {
+    spinner.stop();
+    printError('API 错误: ' + e.message);
+    messages.pop(); // remove failed user message
   }
 }
 
