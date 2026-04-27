@@ -13,7 +13,7 @@ import { displayAccounts, interactiveSwitch, getGhAuthCommands, getGitHubInfo } 
 import { getProjectPaths, ensureProjectRoot } from './modules/paths';
 import { getCliCommands, getCliByTool } from './modules/cli';
 import { getApps } from './modules/apps';
-import { startChat } from './modules/chat';
+import { startChat } from './chat';
 
 const program = new Command();
 
