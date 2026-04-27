@@ -20,7 +20,7 @@ const program = new Command();
 program
   .name('coding')
   .description('My-Windows-CLI - Project paths, GitHub status, CLI commands, AI chat')
-  .version('2.0.0')
+  .version('0.6.0')
   // Basic info options
   .option('-s, --short', 'Short output (key info only)')
   .option('-p, --paths', 'Show project paths only')
@@ -110,7 +110,7 @@ program
     // Full output
     console.log(chalk.bold.cyan(`
 ╔══════════════════════════════════════════════════════════════╗
-║               🤖 My-Windows-CLI v2.0.0                    ║
+║               🤖 My-Windows-CLI v0.6.0                    ║
 ╚══════════════════════════════════════════════════════════════╝
     `));
 
