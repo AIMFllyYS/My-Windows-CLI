@@ -5,14 +5,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import * as dotenv from 'dotenv';
+import { getProjectRoot } from '../utils/config';
 
 // Load .env file
 dotenv.config();
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
 const DEFAULT_MODEL = 'deepseek-chat';
-
-const CONFIG_PATH = path.join(process.env.USERPROFILE || process.env.HOME || '.', '.coding-cli.json');
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
@@ -24,11 +23,7 @@ function getSystemPrompt(): string {
   let projects = 'Unknown';
 
   try {
-    let root = 'C:/project';
-    try {
-      const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-      if (config.projectRoot) root = config.projectRoot;
-    } catch {}
+    const root = getProjectRoot() || 'C:/project';
     const entries = fs.readdirSync(root, { withFileTypes: true });
     projects = entries
       .filter(e => e.isDirectory())

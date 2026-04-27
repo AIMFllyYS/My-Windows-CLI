@@ -171,12 +171,23 @@ npm run clean
 ```
 My-Windows-CLI/
 ├── src/
-│   ├── index.ts      # 入口点和命令解析
-│   ├── github.ts     # GitHub API 集成
-│   ├── paths.ts      # 项目路径扫描
-│   ├── cli.ts        # AI CLI 命令参考
-│   ├── apps.ts       # 应用启动命令
-│   └── chat.ts       # AI 对话实现
+│   ├── index.ts              # 入口点和命令解析
+│   ├── modules/
+│   │   ├── github/           # GitHub 集成
+│   │   │   ├── auth.ts       # 账号管理和切换
+│   │   │   ├── issues.ts     # Issues 查询
+│   │   │   └── index.ts      # 模块导出
+│   │   ├── paths.ts          # 项目路径扫描
+│   │   ├── cli.ts            # AI CLI 命令参考
+│   │   ├── apps.ts           # 应用启动命令
+│   │   └── chat.ts           # AI 对话 (DeepSeek)
+│   ├── utils/
+│   │   ├── config.ts         # 共享配置管理
+│   │   └── selector.ts       # 交互式终端选择器
+│   └── types/                # TypeScript 类型定义
+├── scripts/
+│   ├── create_shortcut.ps1   # Windows 开机启动快捷方式
+│   └── tmp/                  # 临时文件 (不追踪 git)
 ├── package.json
 ├── tsconfig.json
 ├── .env.example

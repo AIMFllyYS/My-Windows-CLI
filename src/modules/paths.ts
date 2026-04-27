@@ -2,29 +2,7 @@ import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
-
-const CONFIG_PATH = path.join(process.env.USERPROFILE || process.env.HOME || '.', '.coding-cli.json');
-
-interface CliConfig {
-  projectRoot?: string;
-}
-
-function loadConfig(): CliConfig {
-  try {
-    return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-  } catch {
-    return {};
-  }
-}
-
-function saveConfig(config: CliConfig): void {
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
-}
-
-function getProjectRoot(): string {
-  const config = loadConfig();
-  return config.projectRoot || '';
-}
+import { loadConfig, saveConfig, getProjectRoot } from '../utils/config';
 
 /**
  * Prompt user to set project root on first run. Returns the configured path.

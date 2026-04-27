@@ -171,12 +171,23 @@ npm run clean
 ```
 My-Windows-CLI/
 ├── src/
-│   ├── index.ts      # Entry point & command parsing
-│   ├── github.ts     # GitHub API integration
-│   ├── paths.ts      # Project path scanning
-│   ├── cli.ts        # AI CLI commands reference
-│   ├── apps.ts       # App launch commands
-│   └── chat.ts       # AI chat implementation
+│   ├── index.ts              # Entry point & command parsing
+│   ├── modules/
+│   │   ├── github/           # GitHub integration
+│   │   │   ├── auth.ts       # Account management & switching
+│   │   │   ├── issues.ts     # Issues fetching
+│   │   │   └── index.ts      # Module exports
+│   │   ├── paths.ts          # Project path scanning
+│   │   ├── cli.ts            # AI CLI commands reference
+│   │   ├── apps.ts           # App launch commands
+│   │   └── chat.ts           # AI chat (DeepSeek)
+│   ├── utils/
+│   │   ├── config.ts         # Shared config management
+│   │   └── selector.ts       # Interactive terminal selector
+│   └── types/                # TypeScript type definitions
+├── scripts/
+│   ├── create_shortcut.ps1   # Windows startup shortcut
+│   └── tmp/                  # Temporary files (git-ignored)
 ├── package.json
 ├── tsconfig.json
 ├── .env.example
