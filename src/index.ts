@@ -2,128 +2,145 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { getGithubInfo } from './github';
-import { getProjectPaths } from './paths';
-import { getCliCommands, getCliByTool } from './cli';
-import { getApps } from './apps';
-import { startChat } from './chat';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
-// Load env from known location
-const envPath = 'C:/project/1037Solo/StudySolo-Dev/backend/.env';
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-}
+// Load .env file
+dotenv.config();
+
+// Import modules
+import { displayAccounts, interactiveSwitch, getGhAuthCommands, getGitHubInfo } from './modules/github';
+import { getProjectPaths } from './modules/paths';
+import { getCliCommands, getCliByTool } from './modules/cli';
+import { getApps } from './modules/apps';
+import { startChat } from './modules/chat';
 
 const program = new Command();
 
 program
   .name('coding')
-  .description('Coding quick command tool - project paths, GitHub status, CLI commands, AI chat')
-  .version('1.0.0')
+  .description('My-Windows-CLI - Project paths, GitHub status, CLI commands, AI chat')
+  .version('2.0.0')
+  // Basic info options
   .option('-s, --short', 'Short output (key info only)')
-  .option('-i, --issues', 'Show GitHub issues only')
   .option('-p, --paths', 'Show project paths only')
   .option('-a, --apps', 'Show app launch commands only')
-  .option('-c, --cli <tool>', 'Show CLI commands (use: cc, kiro, codex, gemini, cursor, or "all")')
+  // GitHub options
+  .option('-g, --gh', 'Show GitHub accounts and issues')
+  .option('--gh-accounts', 'Show GitHub accounts only')
+  .option('--gh-switch', 'Interactive GitHub account switcher')
+  .option('--gh-issues', 'Show GitHub issues only')
+  // CLI reference options
+  .option('-c, --cli <tool>', 'Show CLI commands (cc/kiro/codex/gemini/cursor/all)')
   .option('-t, --task <description>', 'Task description for CLI command generation')
+  // AI chat options
   .option('-C, --chat', 'Start AI chat mode (interactive)')
   .option('-A, --ai', 'Start AI chat mode (alias for --chat)')
   .option('-m, --model <model>', 'AI model (default: deepseek-chat)')
+  // Action handler
   .action(async (opts) => {
-    // Chat mode
+    // AI Chat mode (takes priority)
     if (opts.chat || opts.ai) {
       await startChat(opts.model);
       return;
     }
 
-    const isShort = opts.short || false;
-    const showPaths = opts.paths || false;
-    const showApps = opts.apps || false;
-    const showIssues = opts.issues || false;
-    const cliTool = opts.cli || null;
-    const taskDesc = opts.task || null;
+    // GitHub account switcher
+    if (opts.ghSwitch) {
+      await interactiveSwitch();
+      return;
+    }
 
-    // If specific CLI tool requested
-    if (cliTool) {
+    // GitHub accounts only
+    if (opts.ghAccounts) {
+      displayAccounts();
+      return;
+    }
+
+    // GitHub issues only
+    if (opts.ghIssues) {
+      await getGitHubInfo({ showAccounts: false, showIssues: true });
+      return;
+    }
+
+    // GitHub full info
+    if (opts.gh) {
+      console.log(chalk.bold.cyan('\n╔══════════════════════════════════════════════════════════════╗'));
+      console.log(chalk.bold.cyan('║                    🐙 GitHub Status                         ║'));
+      console.log(chalk.bold.cyan('╚══════════════════════════════════════════════════════════════╝\n'));
+      await getGitHubInfo({ showAccounts: true, showIssues: true });
+      return;
+    }
+
+    // CLI reference
+    if (opts.cli) {
       const toolMap: Record<string, string> = {
-        '-cc': 'claude',
-        'cc': 'claude',
-        '-kiro': 'kiro',
-        'kiro': 'kiro',
-        '-codex': 'codex',
-        'codex': 'codex',
-        '-gemini': 'gemini',
-        'gemini': 'gemini',
-        '-cursor': 'cursor',
-        'cursor': 'cursor'
+        '-cc': 'claude', 'cc': 'claude',
+        '-kiro': 'kiro', 'kiro': 'kiro',
+        '-codex': 'codex', 'codex': 'codex',
+        '-gemini': 'gemini', 'gemini': 'gemini',
+        '-cursor': 'cursor', 'cursor': 'cursor'
       };
-      const tool = toolMap[cliTool] || cliTool;
+      const tool = toolMap[opts.cli] || opts.cli;
       if (tool === 'all') {
-        console.log(chalk.bold('\n=== CLI Auto Commands ===\n'));
-        console.log(getCliCommands(taskDesc));
+        console.log(chalk.bold('\n=== ⚡ CLI Auto Commands ===\n'));
+        console.log(getCliCommands(opts.task));
       } else {
         console.log(chalk.bold(`\n=== ${tool.toUpperCase()} CLI ===\n`));
-        console.log(getCliByTool(tool, taskDesc));
+        console.log(getCliByTool(tool, opts.task));
       }
       return;
     }
 
-    // Specific filters
-    if (showPaths) {
-      console.log(chalk.bold('\n=== Project Paths ===\n'));
+    // Project paths only
+    if (opts.paths) {
+      console.log(chalk.bold('\n📁 Project Paths\n'));
       console.log(getProjectPaths());
       return;
     }
 
-    if (showApps) {
-      console.log(chalk.bold('\n=== App Launch Commands ===\n'));
+    // Apps only
+    if (opts.apps) {
+      console.log(chalk.bold('\n🚀 App Launch Commands\n'));
       console.log(getApps());
-      return;
-    }
-
-    if (showIssues) {
-      console.log(chalk.bold('\n=== GitHub Issues ===\n'));
-      await getGithubInfo(true);
       return;
     }
 
     // Full output
     console.log(chalk.bold.cyan(`
 ╔══════════════════════════════════════════════════════════════╗
-║                    CODING CLI v1.0.0                         ║
+║               🤖 My-Windows-CLI v2.0.0                    ║
 ╚══════════════════════════════════════════════════════════════╝
     `));
 
-    // 1. Project Paths
+    // 1. GitHub Status
+    console.log(chalk.bold('\n🐙 GitHub Status'));
+    await getGitHubInfo({ showAccounts: true, showIssues: true });
+
+    // 2. Project Paths
     console.log(chalk.bold('\n📁 Project Paths'));
     console.log(getProjectPaths());
 
-    // 2. GitHub Info
-    console.log(chalk.bold('\n🐙 GitHub Status'));
-    await getGithubInfo(isShort);
-
     // 3. CLI Commands
     console.log(chalk.bold('\n⚡ CLI Auto Commands'));
-    console.log(getCliCommands(taskDesc));
+    console.log(getCliCommands(opts.task));
 
     // 4. App Launch
     console.log(chalk.bold('\n🚀 App Launch Commands'));
     console.log(getApps());
 
+    // Help footer
     console.log(chalk.bold.cyan('\n╔══════════════════════════════════════════════════════════════╗'));
     console.log(chalk.bold.cyan('║  Usage: coding [options]                                       ║'));
-    console.log(chalk.bold.cyan('║    --short    Short output                                     ║'));
-    console.log(chalk.bold.cyan('║    --paths    Project paths only                              ║'));
-    console.log(chalk.bold.cyan('║    --apps     App launch commands only                         ║'));
-    console.log(chalk.bold.cyan('║    --issues   GitHub issues only                              ║'));
-    console.log(chalk.bold.cyan('║    --cli cc   Claude Code CLI only                            ║'));
-    console.log(chalk.bold.cyan('║    --cli kiro Kiro CLI only                                  ║'));
-    console.log(chalk.bold.cyan('║    --cli all  All CLI Auto commands                           ║'));
-    console.log(chalk.bold.cyan('║    --chat     Start AI chat mode                              ║'));
-    console.log(chalk.bold.cyan('║    --ai       Alias for --chat                               ║'));
-    console.log(chalk.bold.cyan('║    --task     Add task description                             ║'));
+    console.log(chalk.bold.cyan('╠══════════════════════════════════════════════════════════════╣'));
+    console.log(chalk.bold.cyan('║  --gh          GitHub accounts + issues                       ║'));
+    console.log(chalk.bold.cyan('║  --gh-accounts  GitHub accounts only                        ║'));
+    console.log(chalk.bold.cyan('║  --gh-switch   Interactive account switcher                 ║'));
+    console.log(chalk.bold.cyan('║  --gh-issues   Issues only                                 ║'));
+    console.log(chalk.bold.cyan('║  --paths       Project paths only                          ║'));
+    console.log(chalk.bold.cyan('║  --apps        App launch commands                          ║'));
+    console.log(chalk.bold.cyan('║  --cli <tool>  CLI commands (cc/kiro/codex/gemini/cursor) ║'));
+    console.log(chalk.bold.cyan('║  --chat        AI chat mode                                ║'));
     console.log(chalk.bold.cyan('╚══════════════════════════════════════════════════════════════╝\n'));
   });
 
