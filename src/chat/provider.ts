@@ -5,7 +5,7 @@ import { ChatMessage, ModelInfo } from '../types';
 dotenv.config();
 
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || '';
-const ZHIPU_KEY = process.env.ZHIPU_API_KEY || 'cc12a53e51ea4ed082d2e42f95806df0.0PkfvBIeV7rjdBll';
+const ZHIPU_KEY = process.env.ZHIPU_API_KEY || '';
 
 interface StreamCallbacks {
   onToken: (token: string) => void;
@@ -72,7 +72,12 @@ export function streamChat(
       res.on('end', () => {
         try {
           const parsed = JSON.parse(errBody);
-          callbacks.onError(new Error(parsed.error?.message || `API ${res.statusCode}`));
+          const msg = parsed.error?.message || `API ${res.statusCode}`;
+          if (res.statusCode === 401) {
+            callbacks.onError(new Error('API Key 无效或未配置，请检查 .env 文件'));
+          } else {
+            callbacks.onError(new Error(msg));
+          }
         } catch {
           callbacks.onError(new Error(`API 错误 ${res.statusCode}`));
         }

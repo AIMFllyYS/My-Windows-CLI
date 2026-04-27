@@ -1,24 +1,20 @@
 import { ModelInfo } from '../types';
 
-// === Model Registry ===
-// DeepSeek: deepseek-chat (V4 Flash non-thinking), deepseek-reasoner (V4 Flash thinking)
-// ZhiPu: Uses open.bigmodel.cn API with dot-notation model IDs
-
 export const MODELS: ModelInfo[] = [
-  // DeepSeek
+  // DeepSeek V4
   {
-    id: 'deepseek-chat',
+    id: 'deepseek-v4-flash',
     name: 'DeepSeek V4 Flash',
     provider: 'deepseek',
     description: '快速通用对话',
   },
   {
-    id: 'deepseek-reasoner',
-    name: 'DeepSeek V4 Reasoner',
+    id: 'deepseek-v4-pro',
+    name: 'DeepSeek V4 Pro',
     provider: 'deepseek',
-    description: '深度推理 (思考模式)',
+    description: '旗舰推理模型',
   },
-  // ZhiPu GLM - core models
+  // ZhiPu GLM
   {
     id: 'glm-4.7-flash',
     name: 'GLM-4.7 Flash',
@@ -42,7 +38,7 @@ export const MODELS: ModelInfo[] = [
   },
 ];
 
-export const DEFAULT_MODEL_ID = 'deepseek-chat';
+export const DEFAULT_MODEL_ID = 'deepseek-v4-flash';
 
 export function getModelById(id: string): ModelInfo | undefined {
   return MODELS.find(m => m.id === id);

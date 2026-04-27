@@ -23,116 +23,77 @@ export async function interactiveSelect(config: SelectorConfig): Promise<void> {
   }
 
   let selectedIndex = 0;
+  // Total lines rendered: title + hint + blank + options = 3 + options.length
+  const totalLines = 3 + options.length;
 
-  // Clear line and move cursor home
-  const clearLine = () => {
-    process.stdout.write('\r\x1B[K');
+  const clearRendered = () => {
+    // Move up and clear each line
+    for (let i = 0; i < totalLines; i++) {
+      process.stdout.write('\x1B[A\x1B[2K');
+    }
   };
 
-  const moveCursorUp = (lines: number) => {
-    process.stdout.write(`\x1B[${lines}A`);
-  };
-
-  const moveCursorDown = (lines: number) => {
-    process.stdout.write(`\x1B[${lines}B`);
-  };
-
-  // Render the selector
-  const render = () => {
-    clearLine();
+  const render = (first = false) => {
+    if (!first) clearRendered();
     console.log(chalk.bold.cyan(title));
-    console.log(chalk.gray('(Use ↑/↓ or j/k to navigate, Enter to select, Esc/q to cancel)\n'));
-
+    console.log(chalk.gray('(↑/↓ 选择, Enter 确认, Esc 取消)'));
+    console.log('');
     options.forEach((option, index) => {
       const isSelected = index === selectedIndex;
       const prefix = isSelected ? chalk.green('▶ ') : '  ';
       const label = isSelected ? chalk.bold.white(option.label) : chalk.white(option.label);
       const desc = option.description ? chalk.gray(` - ${option.description}`) : '';
-
       console.log(`${prefix}${label}${desc}`);
     });
-
-    // Move cursor back to selection position
-    moveCursorUp(options.length + 2);
   };
 
-  // Set raw mode for keyboard input
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-
-  // @ts-ignore - using internal Node.js method
-  const isRaw = process.stdin.isRaw;
-
   return new Promise<void>((resolve) => {
-    // Enable raw mode
+    const wasRaw = process.stdin.isRaw;
     process.stdin.setRawMode?.(true);
-    process.stdin.resume?.();
-    process.stdin.setEncoding?.('utf8');
+    process.stdin.resume();
 
-    render();
+    // Use readline's built-in keypress emitter
+    readline.emitKeypressEvents(process.stdin);
 
-    const handleKeypress = (char: string, key: { name: string; ctrl: boolean }) => {
-      // Handle Ctrl+C
-      if (key.ctrl && char === 'c') {
+    render(true);
+
+    const onKeypress = (str: string | undefined, key: readline.Key) => {
+      if (!key) return;
+
+      if (key.ctrl && key.name === 'c') {
         cleanup();
         process.exit(0);
       }
 
-      // Handle Escape or q to cancel
-      if (key.name === 'escape' || (key.name === 'q' && !key.ctrl)) {
+      if (key.name === 'escape') {
         cleanup();
-        if (onCancel) onCancel();
+        onCancel?.();
         resolve();
         return;
       }
 
-      // Handle Enter to select
-      if (key.name === 'return' || key.name === 'enter') {
+      if (key.name === 'return') {
         cleanup();
-        const selected = options[selectedIndex];
-        if (selected) {
-          clearLine();
-          onSelect(selected.value);
-        }
+        onSelect(options[selectedIndex].value);
         resolve();
         return;
       }
 
-      // Handle navigation
-      let moved = false;
       if (key.name === 'up' || key.name === 'k') {
         selectedIndex = selectedIndex > 0 ? selectedIndex - 1 : options.length - 1;
-        moved = true;
+        render();
       } else if (key.name === 'down' || key.name === 'j') {
         selectedIndex = selectedIndex < options.length - 1 ? selectedIndex + 1 : 0;
-        moved = true;
-      } else if (key.name === 'home' || (key.name === 'a' && key.ctrl)) {
-        selectedIndex = 0;
-        moved = true;
-      } else if (key.name === 'end' || (key.name === 'e' && key.ctrl)) {
-        selectedIndex = options.length - 1;
-        moved = true;
-      }
-
-      if (moved) {
-        // Clear and re-render
-        moveCursorDown(options.length - selectedIndex);
         render();
       }
     };
 
     const cleanup = () => {
-      process.stdin.removeListener('keypress', handleKeypress);
-      if (!isRaw) {
-        process.stdin.setRawMode?.(false);
-      }
-      process.stdin.pause?.();
-      rl.close();
-      console.log(''); // Newline after selector
+      process.stdin.removeListener('keypress', onKeypress);
+      if (!wasRaw) process.stdin.setRawMode?.(false);
+      // Do NOT pause stdin or close rl - chat loop still needs it
     };
 
-    process.stdin.on('keypress', handleKeypress);
+    process.stdin.on('keypress', onKeypress);
   });
 }
