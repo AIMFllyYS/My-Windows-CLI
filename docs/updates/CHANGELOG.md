@@ -4,6 +4,23 @@
 
 ---
 
+## v0.6.2 (2026-04-27)
+
+**fix: 修复任意目录运行时 .env 加载失败**
+
+- `dotenv.config()` 改为从项目根目录加载 `.env`，不再依赖 cwd
+- 移除 provider.ts 和 modules/chat.ts 中重复的 dotenv 调用
+
+## v0.6.1 (2026-04-27)
+
+**fix: 修复 AI Chat 多个问题**
+
+- 修复模型选择器重复渲染菜单
+- 修复选择模型后退出对话（stdin 被意外关闭）
+- 更新 DeepSeek 模型 ID 为 V4（`deepseek-v4-flash`、`deepseek-v4-pro`）
+- 移除硬编码的 API Key，统一从 `.env` 读取
+- 401 错误提示优化，明确提示检查 API Key
+
 ## v0.6.0 (2026-04-27)
 
 **feat(chat): 重构 AI 对话模块**

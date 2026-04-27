@@ -3,10 +3,11 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import * as fs from 'fs';
+import * as path from 'path';
 import * as dotenv from 'dotenv';
 
-// Load .env file
-dotenv.config();
+// Load .env from project root (not cwd)
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 // Import modules
 import { displayAccounts, interactiveSwitch, getGhAuthCommands, getGitHubInfo } from './modules/github';
@@ -20,7 +21,7 @@ const program = new Command();
 program
   .name('coding')
   .description('My-Windows-CLI - Project paths, GitHub status, CLI commands, AI chat')
-  .version('0.6.0')
+  .version('0.6.2')
   // Basic info options
   .option('-s, --short', 'Short output (key info only)')
   .option('-p, --paths', 'Show project paths only')
@@ -110,7 +111,7 @@ program
     // Full output
     console.log(chalk.bold.cyan(`
 ╔══════════════════════════════════════════════════════════════╗
-║               🤖 My-Windows-CLI v0.6.0                    ║
+║               🤖 My-Windows-CLI v0.6.2                    ║
 ╚══════════════════════════════════════════════════════════════╝
     `));
 

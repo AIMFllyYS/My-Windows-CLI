@@ -7,8 +7,7 @@ import { execSync } from 'child_process';
 import * as dotenv from 'dotenv';
 import { getProjectRoot } from '../utils/config';
 
-// Load .env file
-dotenv.config();
+// .env loaded by entry point
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
 const DEFAULT_MODEL = 'deepseek-chat';

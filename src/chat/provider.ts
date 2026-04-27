@@ -1,8 +1,5 @@
 import * as https from 'https';
-import * as dotenv from 'dotenv';
 import { ChatMessage, ModelInfo } from '../types';
-
-dotenv.config();
 
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || '';
 const ZHIPU_KEY = process.env.ZHIPU_API_KEY || '';
