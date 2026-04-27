@@ -91,7 +91,8 @@ export async function interactiveSelect(config: SelectorConfig): Promise<void> {
     const cleanup = () => {
       process.stdin.removeListener('keypress', onKeypress);
       if (!wasRaw) process.stdin.setRawMode?.(false);
-      // Do NOT pause stdin or close rl - chat loop still needs it
+      // Clear the selector UI from terminal
+      clearRendered();
     };
 
     process.stdin.on('keypress', onKeypress);

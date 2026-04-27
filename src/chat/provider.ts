@@ -1,9 +1,6 @@
 import * as https from 'https';
 import { ChatMessage, ModelInfo } from '../types';
 
-const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || '';
-const ZHIPU_KEY = process.env.ZHIPU_API_KEY || '';
-
 interface StreamCallbacks {
   onToken: (token: string) => void;
   onDone: (full: string) => void;
@@ -18,10 +15,14 @@ interface ProviderSpec {
 }
 
 function getProvider(model: ModelInfo): ProviderSpec {
+  // Read keys at call time (after dotenv has loaded)
+  const deepseekKey = process.env.DEEPSEEK_API_KEY || '';
+  const zhipuKey = process.env.ZHIPU_API_KEY || '';
+
   if (model.provider === 'zhipu') {
-    return { hostname: 'open.bigmodel.cn', path: '/api/paas/v4/chat/completions', key: ZHIPU_KEY };
+    return { hostname: 'open.bigmodel.cn', path: '/api/paas/v4/chat/completions', key: zhipuKey };
   }
-  return { hostname: 'api.deepseek.com', path: '/chat/completions', key: DEEPSEEK_KEY };
+  return { hostname: 'api.deepseek.com', path: '/chat/completions', key: deepseekKey };
 }
 
 /**
@@ -35,6 +36,12 @@ export function streamChat(
 ): void {
   const provider = getProvider(model);
 
+  if (!provider.key) {
+    const name = model.provider === 'zhipu' ? 'ZHIPU_API_KEY' : 'DEEPSEEK_API_KEY';
+    callbacks.onError(new Error(`${name} 未配置，请检查 .env 文件`));
+    return;
+  }
+
   const body: any = {
     model: model.id,
     messages,
@@ -42,7 +49,6 @@ export function streamChat(
     max_tokens: 4096,
   };
 
-  // ZhiPu web search tool integration
   if (tools && tools.length > 0 && model.provider === 'zhipu') {
     body.tools = tools;
   }
@@ -62,6 +68,7 @@ export function streamChat(
   }, (res) => {
     let full = '';
     let buffer = '';
+    let done = false;
 
     if (res.statusCode && res.statusCode >= 400) {
       let errBody = '';
@@ -71,7 +78,7 @@ export function streamChat(
           const parsed = JSON.parse(errBody);
           const msg = parsed.error?.message || `API ${res.statusCode}`;
           if (res.statusCode === 401) {
-            callbacks.onError(new Error('API Key 无效或未配置，请检查 .env 文件'));
+            callbacks.onError(new Error('API Key 无效或已过期，请检查 .env 文件'));
           } else {
             callbacks.onError(new Error(msg));
           }
@@ -88,10 +95,12 @@ export function streamChat(
       buffer = lines.pop() || '';
 
       for (const line of lines) {
+        if (done) return;
         const trimmed = line.trim();
         if (!trimmed || !trimmed.startsWith('data: ')) continue;
         const payload = trimmed.slice(6);
         if (payload === '[DONE]') {
+          done = true;
           callbacks.onDone(full);
           return;
         }
@@ -100,7 +109,6 @@ export function streamChat(
           const delta = parsed.choices?.[0]?.delta;
           if (!delta) continue;
 
-          // Handle reasoning tokens (DeepSeek reasoner)
           if (delta.reasoning_content && callbacks.onReasoning) {
             callbacks.onReasoning(delta.reasoning_content);
           }
@@ -114,6 +122,7 @@ export function streamChat(
     });
 
     res.on('end', () => {
+      if (done) return; // Already called onDone via [DONE] signal
       // Process remaining buffer
       if (buffer.trim()) {
         const trimmed = buffer.trim();
@@ -128,7 +137,7 @@ export function streamChat(
           } catch { /* ignore */ }
         }
       }
-      if (full) callbacks.onDone(full);
+      callbacks.onDone(full);
     });
   });
 
@@ -143,6 +152,13 @@ export function streamChat(
 export function chatComplete(messages: ChatMessage[], model: ModelInfo, tools?: any[]): Promise<string> {
   return new Promise((resolve, reject) => {
     const provider = getProvider(model);
+
+    if (!provider.key) {
+      const name = model.provider === 'zhipu' ? 'ZHIPU_API_KEY' : 'DEEPSEEK_API_KEY';
+      reject(new Error(`${name} 未配置，请检查 .env 文件`));
+      return;
+    }
+
     const body: any = { model: model.id, messages, stream: false, max_tokens: 4096 };
     if (tools && tools.length > 0 && model.provider === 'zhipu') {
       body.tools = tools;

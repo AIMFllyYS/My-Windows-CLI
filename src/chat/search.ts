@@ -1,19 +1,23 @@
 import * as https from 'https';
 import { SearchResult, WebSearchResponse } from '../types';
 
-const ZHIPU_API_KEY = process.env.ZHIPU_API_KEY || 'cc12a53e51ea4ed082d2e42f95806df0.0PkfvBIeV7rjdBll';
-
 /**
  * ZhiPu Web Search API - standalone search tool
  * POST https://open.bigmodel.cn/api/paas/v4/web_search
  */
 export function webSearch(query: string, count: number = 5): Promise<SearchResult[]> {
   return new Promise((resolve, reject) => {
+    // Read key at call time (after dotenv has loaded)
+    const apiKey = process.env.ZHIPU_API_KEY || '';
+    if (!apiKey) {
+      reject(new Error('ZHIPU_API_KEY 未配置，请检查 .env 文件'));
+      return;
+    }
+
     const data = JSON.stringify({
-      search_engine: 'search-prime',
+      search_engine: 'search-std',
       search_query: query,
       count,
-      search_recency_filter: 'noLimit',
     });
 
     const req = https.request({
@@ -22,7 +26,7 @@ export function webSearch(query: string, count: number = 5): Promise<SearchResul
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + ZHIPU_API_KEY,
+        'Authorization': 'Bearer ' + apiKey,
         'Content-Length': Buffer.byteLength(data),
       },
     }, (res) => {
@@ -31,7 +35,17 @@ export function webSearch(query: string, count: number = 5): Promise<SearchResul
       res.on('end', () => {
         try {
           const parsed: WebSearchResponse = JSON.parse(body);
-          resolve(parsed.search_result || []);
+          if (parsed.search_result) {
+            resolve(parsed.search_result);
+          } else {
+            // API returned but no results field - might be an error
+            const errMsg = (parsed as any).error?.message;
+            if (errMsg) {
+              reject(new Error(errMsg));
+            } else {
+              resolve([]);
+            }
+          }
         } catch {
           reject(new Error('搜索响应解析失败'));
         }
@@ -44,9 +58,6 @@ export function webSearch(query: string, count: number = 5): Promise<SearchResul
   });
 }
 
-/**
- * Format search results for display
- */
 export function formatSearchResults(results: SearchResult[]): string {
   if (!results.length) return '未找到相关结果。';
   return results.map((r, i) => {
@@ -56,9 +67,6 @@ export function formatSearchResults(results: SearchResult[]): string {
   }).join('\n\n');
 }
 
-/**
- * Format search results as context for AI
- */
 export function formatSearchForAI(results: SearchResult[]): string {
   if (!results.length) return '未找到相关搜索结果。';
   return results.map((r, i) =>
