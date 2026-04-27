@@ -8,6 +8,8 @@
   },
   "scripts": {
     "build": "tsc",
+    "clean": "node -e \"const fs=require('fs'); if(fs.existsSync('dist')) fs.rmSync('dist',{recursive:true})\"",
+    "rebuild": "npm run clean && npm run build",
     "link": "npm link",
     "pkg": "pkg dist/index.js --targets node18-win-x64 --output dist/coding.exe"
   },
