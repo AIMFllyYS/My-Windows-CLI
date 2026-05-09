@@ -25,6 +25,7 @@ import { getProjectPaths, ensureProjectRoot } from './modules/paths';
 import { getCliCommands, getCliByTool } from './modules/cli';
 import { getApps } from './modules/apps';
 import { startChat } from './chat';
+import { runClearA } from './modules/clear';
 
 const program = new Command();
 
@@ -48,8 +49,16 @@ program
   .option('-C, --chat', 'Start AI chat mode (interactive)')
   .option('-A, --ai', 'Start AI chat mode (alias for --chat)')
   .option('-m, --model <model>', 'AI model (default: deepseek-chat)')
+  // Cleanup options
+  .option('--clear-a', 'AI-assisted cleanup of useless background processes')
   // Action handler
   .action(async (opts) => {
+    // Clear-A: AI-assisted background cleanup
+    if (opts.clearA) {
+      await runClearA();
+      return;
+    }
+
     // AI Chat mode (takes priority)
     if (opts.chat || opts.ai) {
       await startChat(opts.model);
@@ -156,6 +165,7 @@ program
     console.log(chalk.bold.cyan('║  --apps        App launch commands                          ║'));
     console.log(chalk.bold.cyan('║  --cli <tool>  CLI commands (cc/kiro/codex/gemini/cursor) ║'));
     console.log(chalk.bold.cyan('║  --chat        AI chat mode                                ║'));
+    console.log(chalk.bold.cyan('║  --clear-a     AI-assisted cleanup of useless background    ║'));
     console.log(chalk.bold.cyan('╚══════════════════════════════════════════════════════════════╝\n'));
   });
 

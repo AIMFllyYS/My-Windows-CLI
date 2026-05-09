@@ -26,3 +26,6 @@ npm-debug.log*
 # Temp files (keep directory, ignore contents)
 scripts/tmp/*
 !scripts/tmp/.gitkeep
+
+# Clear-A logs
+scripts/logs/
