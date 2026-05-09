@@ -34,11 +34,17 @@
 
 在 PowerShell 中运行以下命令，脚本会自动检测并安装 Git / Node.js，随后 clone、构建、注册全局命令，每一步都会请求确认：
 
+**推荐方式（`irm` 编码更稳定）：**
 ```powershell
-iwr -useb https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 | iex
 ```
 
-> 需要管理员权限以通过 winget 自动安装依赖。
+**备选方式（先下载到本地再执行，最可靠）：**
+```powershell
+irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 -OutFile "$env:TEMP\install-coding-cli.ps1"; & "$env:TEMP\install-coding-cli.ps1"
+```
+
+> 需要管理员权限以通过 winget 自动安装依赖。如果中文显示乱码，请先执行 `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`。
 
 ### Manual Installation | 手动安装
 
