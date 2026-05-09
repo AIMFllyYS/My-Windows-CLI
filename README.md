@@ -30,13 +30,25 @@
 
 ## 🚀 Quick Start | 快速开始
 
-### Prerequisites | 前置要求
+### One-Line Install | 一行命令安装
+
+在 PowerShell 中运行以下命令，脚本会自动检测并安装 Git / Node.js，随后 clone、构建、注册全局命令，每一步都会请求确认：
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 | iex
+```
+
+> 需要管理员权限以通过 winget 自动安装依赖。
+
+### Manual Installation | 手动安装
+
+#### Prerequisites | 前置要求
 
 - Node.js >= 18.0.0
 - npm >= 9.0.0
 - Git
 
-### Installation | 安装
+#### Steps | 步骤
 
 ```bash
 # Clone the repository
@@ -178,8 +190,12 @@ ZHIPU_API_KEY=your_api_key_here
 ### Windows Startup | 开机自启动
 
 ```powershell
-# Run the shortcut creation script
+# 自动检测路径
+cd scripts
 powershell -ExecutionPolicy Bypass -File create_shortcut.ps1
+
+# 手动指定路径
+powershell -ExecutionPolicy Bypass -File create_shortcut.ps1 -ExePath "C:\your\path\dist\coding.exe"
 ```
 
 ## 🛠️ Development | 开发
@@ -226,6 +242,7 @@ My-Windows-CLI/
 │   │   └── selector.ts       # Interactive terminal selector
 │   └── types/                # TypeScript type definitions
 ├── scripts/
+│   ├── install.ps1           # One-line install script (Windows)
 │   ├── create_shortcut.ps1   # Windows startup shortcut
 │   ├── clean-c-drive.ps1     # C drive cleanup PowerShell script
 │   ├── logs/                 # Cleanup logs (git-ignored)
