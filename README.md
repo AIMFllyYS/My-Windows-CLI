@@ -17,44 +17,44 @@
 
 > A powerful Windows CLI tool for developers, providing quick access to project paths, GitHub status, AI CLI commands, and interactive AI chat.
 
-## ✨ Features | 功能特点
+## ✨ Features
 
-| Feature | 功能 |
-|---------|------|
-| 📁 **Project Paths** - Scan and display all projects in `C:\project` | 项目路径扫描 - 自动扫描 `C:\project` 下所有项目 |
-| 🐙 **GitHub Status** - View recent issues and auth commands | GitHub 状态 - 查看最新 Issues 和认证命令 |
-| ⚡ **AI CLI Reference** - Commands for Claude, Kiro, Codex, Gemini, Cursor | AI CLI 参考 - Claude, Kiro, Codex, Gemini, Cursor 命令 |
-| 🚀 **App Launcher** - Quick launch commands for common apps | 应用启动 - 常用应用的快速启动命令 |
-| 🤖 **AI Chat Mode** - Interactive AI conversation with DeepSeek/GLM | AI 对话模式 - 与 DeepSeek/智谱 GLM 的交互式 AI 对话 |
-| 🧹 **Clear** - AI-assisted cleanup of useless processes & C drive | AI 辅助清理 - 无用进程清理 + C 盘清理 |
+| Feature | Description |
+|---------|-------------|
+| 📁 **Project Paths** - Scan and display all projects in `C:\project` | Auto-scan all projects under `C:\project` |
+| 🐙 **GitHub Status** - View recent issues and auth commands | Check latest Issues and authentication commands |
+| ⚡ **AI CLI Reference** - Commands for Claude, Kiro, Codex, Gemini, Cursor | AI CLI commands reference |
+| 🚀 **App Launcher** - Quick launch commands for common apps | Quick launcher for common applications |
+| 🤖 **AI Chat Mode** - Interactive AI conversation with DeepSeek/GLM | Interactive AI chat with DeepSeek/ZhiPu GLM |
+| 🧹 **Clear** - AI-assisted cleanup of useless processes & C drive | AI-assisted cleanup for background processes and C drive |
 
-## 🚀 Quick Start | 快速开始
+## 🚀 Quick Start
 
-### One-Line Install | 一行命令安装
+### One-Line Install
 
-在 PowerShell 中运行以下命令，脚本会自动检测并安装 Git / Node.js，随后 clone、构建、注册全局命令，每一步都会请求确认：
+Run the following command in PowerShell. The script will auto-detect and install Git / Node.js, then clone, build, and optionally register the global command. Each step requires confirmation:
 
-**推荐方式（`irm` 编码更稳定）：**
+**Recommended (`irm` has more stable encoding):**
 ```powershell
 irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 | iex
 ```
 
-**备选方式（先下载到本地再执行，最可靠）：**
+**Alternative (download to local first, most reliable):**
 ```powershell
 irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 -OutFile "$env:TEMP\install-coding-cli.ps1"; & "$env:TEMP\install-coding-cli.ps1"
 ```
 
-> 需要管理员权限以通过 winget 自动安装依赖。如果中文显示乱码，请先执行 `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`。
+> Administrator privileges may be required for winget to install dependencies. If Chinese characters appear garbled, run `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` first.
 
-### Manual Installation | 手动安装
+### Manual Installation
 
-#### Prerequisites | 前置要求
+#### Prerequisites
 
 - Node.js >= 18.0.0
 - npm >= 9.0.0
 - Git
 
-#### Steps | 步骤
+#### Steps
 
 ```bash
 # Clone the repository
@@ -74,7 +74,7 @@ npm link
 npm run pkg
 ```
 
-### First Run | 首次运行
+### First Run
 
 ```bash
 # Copy and configure environment variables
@@ -85,9 +85,9 @@ cp .env.example .env
 coding
 ```
 
-## 📖 Usage | 使用指南
+## 📖 Usage
 
-### Basic Commands | 基本命令
+### Basic Commands
 
 ```bash
 # Full output (all info)
@@ -102,7 +102,7 @@ coding --apps       # App launch commands only
 coding --issues     # GitHub issues only
 ```
 
-### AI CLI Reference | AI CLI 参考
+### AI CLI Reference
 
 ```bash
 # Show all AI CLI auto commands
@@ -119,7 +119,7 @@ coding --cli cursor  # Cursor
 coding --cli cc --task "Fix the login bug"
 ```
 
-### AI Chat Mode | AI 对话模式
+### AI Chat Mode
 
 ```bash
 # Start interactive chat
@@ -132,33 +132,33 @@ coding --ai
 coding --chat --model deepseek-chat
 ```
 
-### Clear Mode | 清理模式
+### Clear Mode
 
 ```bash
-# AI-assisted useless process cleanup | AI 辅助清理无用后台进程
+# AI-assisted useless process cleanup
 coding --clear -p
 coding --clear --process
 
-# AI-assisted C drive cleanup | AI 辅助 C 盘清理
+# AI-assisted C drive cleanup
 coding --clear -d
 coding --clear --drive
 
-# Both process + drive cleanup | 同时进行进程和硬盘清理
+# Both process + drive cleanup
 coding --clear -a
 coding --clear --all
 
-# Shortcut | 快捷方式
+# Shortcut
 coding --clear-a
 ```
 
-> **Clear Features | 清理特性**
+> **Clear Features**
 > - 🤖 AI analyzes which processes/files are safe to remove
 > - 🛡️ Local whitelist protects system-critical processes
 > - ✅ User confirmation before any deletion
 > - 📝 Detailed logs saved to `scripts/logs/`
 > - 🧹 C drive: Conservative / Aggressive dual modes
 
-> **AI Chat Features | AI 对话特性**
+> **AI Chat Features**
 > - 🔒 Read-only mode - Cannot edit/create/delete files
 > - 🛠️ Available tools: `ls`, `dir`, `Read`, `Grep`, `WebSearch`
 > - 🔍 Built-in web search with auto AI summarization
@@ -166,7 +166,7 @@ coding --clear-a
 > - 💬 Multi-turn conversations
 > - 🌐 Uses DeepSeek / ZhiPu API
 
-## 📋 Supported AI CLI Tools | 支持的 AI CLI 工具
+## 📋 Supported AI CLI Tools
 
 | Tool | CLI Command | Auto Mode Command |
 |------|-------------|-------------------|
@@ -176,9 +176,9 @@ coding --clear-a
 | **Gemini** | `gemini` | `gemini "task"` |
 | **Cursor** | `cursor` | `cursor --no-install "task"` |
 
-## ⚙️ Configuration | 配置
+## ⚙️ Configuration
 
-### Environment Variables | 环境变量
+### Environment Variables
 
 Create a `.env` file based on `.env.example`:
 
@@ -193,18 +193,18 @@ ZHIPU_API_KEY=your_api_key_here
 # Can also be read from ~/project/1037Solo/StudySolo-Dev/backend/.env
 ```
 
-### Windows Startup | 开机自启动
+### Windows Startup
 
 ```powershell
-# 自动检测路径
+# Auto-detect path
 cd scripts
 powershell -ExecutionPolicy Bypass -File create_shortcut.ps1
 
-# 手动指定路径
+# Manually specify path
 powershell -ExecutionPolicy Bypass -File create_shortcut.ps1 -ExePath "C:\your\path\dist\coding.exe"
 ```
 
-## 🛠️ Development | 开发
+## 🛠️ Development
 
 ```bash
 # Build
@@ -220,7 +220,7 @@ npm run pkg
 npm run clean
 ```
 
-## 📁 Project Structure | 项目结构
+## 📁 Project Structure
 
 ```
 My-Windows-CLI/
@@ -259,7 +259,7 @@ My-Windows-CLI/
 └── README.md
 ```
 
-## 🤝 Contributing | 贡献
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -269,11 +269,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License | 许可证
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments | 致谢
+## 🙏 Acknowledgments
 
 - [Anthropic Claude Code](https://docs.anthropic.com/en/docs/claude-code) - AI coding assistant
 - [DeepSeek](https://www.deepseek.com/) - LLM API provider

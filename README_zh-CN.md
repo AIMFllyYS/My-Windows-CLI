@@ -21,12 +21,12 @@
 
 | 功能 | 说明 |
 |------|------|
-| 📁 **项目路径** - 扫描并显示 `C:\project` 下所有项目 | 项目路径扫描 |
-| 🐙 **GitHub 状态** - 查看最新 Issues 和认证命令 | GitHub 集成 |
-| ⚡ **AI CLI 参考** - Claude, Kiro, Codex, Gemini, Cursor 命令 | AI CLI 参考 |
-| 🚀 **应用启动** - 常用应用的快速启动命令 | 应用启动器 |
-| 🤖 **AI 对话模式** - 与 DeepSeek/智谱 GLM 的交互式 AI 对话 | AI 聊天 |
-| 🧹 **AI 辅助清理** - 无用进程清理 + C 盘清理 | 系统清理 |
+| 📁 **项目路径** - 扫描并显示 `C:\project` 下所有项目 | 自动扫描 `C:\project` 下的所有项目 |
+| 🐙 **GitHub 状态** - 查看最新 Issues 和认证命令 | 查看最新 Issues 和账号切换命令 |
+| ⚡ **AI CLI 参考** - Claude, Kiro, Codex, Gemini, Cursor 命令 | AI CLI 命令速查参考 |
+| 🚀 **应用启动** - 常用应用的快速启动命令 | 常用应用的快速启动器 |
+| 🤖 **AI 对话模式** - 与 DeepSeek/智谱 GLM 的交互式 AI 对话 | 与 DeepSeek/智谱 GLM 交互式对话 |
+| 🧹 **AI 辅助清理** - 无用进程清理 + C 盘清理 | AI 辅助清理后台进程和 C 盘 |
 
 ## 🚀 快速开始
 
