@@ -1,6 +1,6 @@
 {
   "name": "coding-cli",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Coding quick command tool - project paths, GitHub status, CLI auto commands",
   "main": "src/index.ts",
   "bin": {
