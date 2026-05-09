@@ -1,5 +1,4 @@
 #Requires -Version 5.1
-#Requires -PSEdition Desktop
 
 <#
 .SYNOPSIS
@@ -125,29 +124,43 @@ if (-not $isInRepo -and (Test-Path ".\package.json")) {
 
 # ──────────────── 欢迎 ────────────────
 
+# 动态读取版本号
+$displayVersion = "0.6.4"
+if ($isInRepo -and (Test-Path "$repoRoot\package.json")) {
+    try {
+        $pkgVer = Get-Content "$repoRoot\package.json" -Raw | ConvertFrom-Json
+        $displayVersion = $pkgVer.version
+    } catch {}
+}
+
 Write-Header "Coding CLI 一键安装脚本"
-Write-Host "版本: v0.6.4"
+Write-Host "版本: v$displayVersion"
 Write-Host "仓库: $RepoUrl"
 Write-Host "`n本脚本将引导你完成以下步骤，每一步都会请求确认:`n"
-Write-Host "  1. 检查并安装 Git"
-Write-Host "  2. 检查并安装 Node.js (>= $MinNodeMajor)"
+
+$stepNum = 1
+Write-Host "  $stepNum. 检查并安装 Git"; $stepNum++
+Write-Host "  $stepNum. 检查并安装 Node.js (>= $MinNodeMajor)"; $stepNum++
 if (-not $isInRepo) {
-    Write-Host "  3. 克隆仓库到本地"
+    Write-Host "  $stepNum. 克隆仓库到本地"; $stepNum++
 }
-Write-Host "  3. npm install   (安装依赖)"
-Write-Host "  4. npm run build (编译 TypeScript)"
-Write-Host "  5. npm link      (全局注册 coding 命令)"
-Write-Host "  6. npm run pkg   (打包为 dist\coding.exe)"
-Write-Host "  7. 设置开机自启动`n"
+Write-Host "  $stepNum. npm install   (安装依赖)"; $stepNum++
+Write-Host "  $stepNum. npm run build (编译 TypeScript)"; $stepNum++
+Write-Host "  $stepNum. npm link      (全局注册 coding 命令)"; $stepNum++
+Write-Host "  $stepNum. npm run pkg   (打包为 dist\coding.exe)"; $stepNum++
+Write-Host "  $stepNum. 设置开机自启动`n"
 
 if (-not (Confirm-Step "是否开始安装?")) {
     Write-Host "安装已取消。" -ForegroundColor Yellow
     exit 0
 }
 
+$script:stepNum = 1
+
 # ──────────────── 步骤 1: Git ────────────────
 
-Write-Header "步骤 1: 检查 Git"
+Write-Header "步骤 $($script:stepNum): 检查 Git"
+$script:stepNum++
 if (Test-Command git) {
     $gitVer = git --version
     Write-Success "Git 已安装: $gitVer"
@@ -171,7 +184,8 @@ if (Test-Command git) {
 
 # ──────────────── 步骤 2: Node.js ────────────────
 
-Write-Header "步骤 2: 检查 Node.js"
+Write-Header "步骤 $($script:stepNum): 检查 Node.js"
+$script:stepNum++
 $nodeMajor = Get-NodeMajor
 if ($nodeMajor -ge $MinNodeMajor) {
     Write-Success "Node.js 已安装: $(node --version)"
@@ -216,11 +230,13 @@ if (-not (Test-Command npm)) {
 # ──────────────── 步骤 3: Clone 仓库 ────────────────
 
 if ($isInRepo) {
-    Write-Header "步骤 3: 仓库检测"
+    Write-Header "步骤 $($script:stepNum): 仓库检测"
+    $script:stepNum++
     Write-Success "检测到当前已位于仓库目录: $repoRoot"
     Set-Location $repoRoot
 } else {
-    Write-Header "步骤 3: 克隆仓库"
+    Write-Header "步骤 $($script:stepNum): 克隆仓库"
+    $script:stepNum++
     $targetDir = $InstallDir
     if ([string]::IsNullOrWhiteSpace($targetDir)) {
         $targetDir = Read-Host "请输入安装目录 [默认: $DefaultDir]"
@@ -254,7 +270,8 @@ if ($isInRepo) {
 
 # ──────────────── 步骤 4: npm install ────────────────
 
-Write-Header "步骤 4: 安装 Node 依赖 (npm install)"
+Write-Header "步骤 $($script:stepNum): 安装 Node 依赖 (npm install)"
+$script:stepNum++
 if (Confirm-Step "是否执行 npm install?") {
     npm install
     if ($LASTEXITCODE -ne 0) {
@@ -268,7 +285,8 @@ if (Confirm-Step "是否执行 npm install?") {
 
 # ──────────────── 步骤 5: npm run build ────────────────
 
-Write-Header "步骤 5: 编译 TypeScript (npm run build)"
+Write-Header "步骤 $($script:stepNum): 编译 TypeScript (npm run build)"
+$script:stepNum++
 if (Confirm-Step "是否执行 npm run build?") {
     npm run build
     if ($LASTEXITCODE -ne 0) {
@@ -282,7 +300,8 @@ if (Confirm-Step "是否执行 npm run build?") {
 
 # ──────────────── 步骤 6: npm link ────────────────
 
-Write-Header "步骤 6: 全局注册 coding 命令 (npm link)"
+Write-Header "步骤 $($script:stepNum): 全局注册 coding 命令 (npm link)"
+$script:stepNum++
 if (Confirm-Step "是否执行 npm link 以全局注册 'coding' 命令?") {
     npm link
     if ($LASTEXITCODE -ne 0) {
@@ -296,7 +315,8 @@ if (Confirm-Step "是否执行 npm link 以全局注册 'coding' 命令?") {
 
 # ──────────────── 步骤 7: npm run pkg ────────────────
 
-Write-Header "步骤 7: 打包为独立 exe (npm run pkg)"
+Write-Header "步骤 $($script:stepNum): 打包为独立 exe (npm run pkg)"
+$script:stepNum++
 $exePath = Join-Path $repoRoot "dist\coding.exe"
 if (Confirm-Step "是否执行 npm run pkg 打包为 dist\coding.exe?") {
     npm run pkg
@@ -311,7 +331,8 @@ if (Confirm-Step "是否执行 npm run pkg 打包为 dist\coding.exe?") {
 
 # ──────────────── 步骤 8: 开机自启动 ────────────────
 
-Write-Header "步骤 8: 设置开机自启动"
+Write-Header "步骤 $($script:stepNum): 设置开机自启动"
+$script:stepNum++
 if (Confirm-Step "是否设置开机自启动 (创建启动文件夹快捷方式)?") {
     if (Test-Path $exePath) {
         New-StartupShortcut -ExePath $exePath -WorkingDir $repoRoot
