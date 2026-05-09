@@ -4,6 +4,10 @@ import * as path from 'path';
 import * as readline from 'readline';
 import { loadConfig, saveConfig, getProjectRoot } from '../utils/config';
 
+// In-memory cache for project scanning (30s TTL)
+const scanCache = new Map<string, { projects: ProjectInfo[]; timestamp: number }>();
+const CACHE_TTL = 30000;
+
 /**
  * Prompt user to set project root on first run. Returns the configured path.
  */
@@ -43,6 +47,11 @@ interface ProjectInfo {
 }
 
 function scanProjects(projectRoot: string): ProjectInfo[] {
+  const cached = scanCache.get(projectRoot);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.projects;
+  }
+
   const projects: ProjectInfo[] = [];
   const excludeDirs = ['node_modules', '.git', '.next', 'dist', 'build', '.cache', '__pycache__', 'venv', '.venv', '.env'];
 
@@ -83,7 +92,9 @@ function scanProjects(projectRoot: string): ProjectInfo[] {
     console.log(chalk.red(`Error scanning projects: ${error}`));
   }
 
-  return projects.sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = projects.sort((a, b) => a.name.localeCompare(b.name));
+  scanCache.set(projectRoot, { projects: sorted, timestamp: Date.now() });
+  return sorted;
 }
 
 export function getProjectPaths(projectRoot?: string): string {

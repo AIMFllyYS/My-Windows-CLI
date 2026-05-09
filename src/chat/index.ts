@@ -42,7 +42,7 @@ export async function startChat(modelId?: string): Promise<void> {
     // === Direct Tool Commands ===
     if (isToolCommand(input)) {
       printInfo('执行工具...');
-      const result = executeTool(input);
+      const result = await executeTool(input);
       console.log(chalk.gray('\n  ┌── 工具结果 ──'));
       result.split('\n').forEach(l => console.log(chalk.gray('  │ ') + chalk.white(l)));
       console.log(chalk.gray('  └' + '─'.repeat(40)));
@@ -272,6 +272,13 @@ async function streamAIResponse(messages: ChatMessage[], model: ModelInfo): Prom
     });
 
     messages.push({ role: 'assistant', content: response });
+
+    // Trim history to prevent unbounded growth (keep system + last 19 messages)
+    if (messages.length > 20) {
+      const system = messages[0];
+      messages.splice(1, messages.length - 20);
+      if (messages[0].role !== 'system') messages.unshift(system);
+    }
   } catch (e: any) {
     spinner.stop();
     printError('API 错误: ' + e.message);

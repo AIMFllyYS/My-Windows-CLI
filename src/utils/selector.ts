@@ -90,11 +90,15 @@ export async function interactiveSelect(config: SelectorConfig): Promise<void> {
 
     const cleanup = () => {
       process.stdin.removeListener('keypress', onKeypress);
+      process.removeListener('exit', cleanup);
+      process.removeListener('SIGINT', cleanup);
       if (!wasRaw) process.stdin.setRawMode?.(false);
       // Clear the selector UI from terminal
       clearRendered();
     };
 
     process.stdin.on('keypress', onKeypress);
+    process.once('exit', cleanup);
+    process.once('SIGINT', cleanup);
   });
 }

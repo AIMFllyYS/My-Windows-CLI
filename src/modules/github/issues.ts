@@ -2,12 +2,21 @@ import chalk from 'chalk';
 import * as https from 'https';
 import { getActiveAccount } from './auth';
 
+// Shared agent for GitHub API (keep-alive)
+const githubAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 3,
+  maxFreeSockets: 1,
+  timeout: 30000,
+});
+
 function githubGet(path: string, token?: string): Promise<any> {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'api.github.com',
       path: path,
       method: 'GET',
+      agent: githubAgent,
       headers: {
         'User-Agent': 'My-Windows-CLI',
         'Accept': 'application/vnd.github+json',
@@ -28,6 +37,10 @@ function githubGet(path: string, token?: string): Promise<any> {
     });
 
     req.on('error', reject);
+    req.setTimeout(30000, () => {
+      req.destroy();
+      reject(new Error('GitHub API 请求超时 (30s)'));
+    });
     req.end();
   });
 }
@@ -61,27 +74,34 @@ export async function getRecentIssues(days: number = 7, token?: string): Promise
     }
   } catch {}
 
-  for (const repo of repos) {
-    try {
-      const data: any[] = await githubGet(
-        `/repos/${username}/${repo}/issues?since=${sinceStr}&state=open&per_page=20`,
-        authToken
-      );
-
-      if (Array.isArray(data)) {
-        for (const issue of data) {
-          if (issue.pull_request) continue; // Skip PRs
-          issues.push({
-            number: issue.number,
-            title: issue.title,
-            repo: repo,
-            createdAt: issue.created_at,
-            url: issue.html_url
-          });
+  // Parallel fetch with concurrency limit (max 3 at a time)
+  const CONCURRENCY = 3;
+  for (let i = 0; i < repos.length; i += CONCURRENCY) {
+    const batch = repos.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map(async (repo) => {
+        try {
+          const data: any[] = await githubGet(
+            `/repos/${username}/${repo}/issues?since=${sinceStr}&state=open&per_page=20`,
+            authToken
+          );
+          if (!Array.isArray(data)) return [];
+          return data
+            .filter((issue: any) => !issue.pull_request)
+            .map((issue: any) => ({
+              number: issue.number,
+              title: issue.title,
+              repo: repo,
+              createdAt: issue.created_at,
+              url: issue.html_url,
+            }));
+        } catch {
+          return [];
         }
-      }
-    } catch {
-      // Skip repos that fail
+      })
+    );
+    for (const result of batchResults) {
+      issues.push(...result);
     }
   }
 

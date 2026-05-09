@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
 import { getProjectRoot } from '../utils/config';
 
 /**
@@ -8,7 +8,7 @@ import { getProjectRoot } from '../utils/config';
  * SAFETY: No write/delete/modify operations allowed.
  */
 
-export function executeTool(command: string): string {
+export async function executeTool(command: string): Promise<string> {
   const trimmed = command.trim();
   const parts = trimmed.split(/\s+/);
   const cmd = parts[0].toLowerCase();
@@ -45,15 +45,18 @@ export function executeTool(command: string): string {
     }
   }
 
-  // grep (read-only search)
+  // grep (read-only search) — async to avoid blocking event loop
   if (cmd === 'grep' || cmd === 'rg') {
-    try {
-      const result = execSync(trimmed, { cwd: process.cwd(), encoding: 'utf-8', timeout: 10000 });
-      return result || '(no matches)';
-    } catch (e: any) {
-      if (e.status === 1) return '(no matches)';
-      return 'Error: ' + e.message;
-    }
+    return new Promise((resolve) => {
+      exec(trimmed, { cwd: process.cwd(), encoding: 'utf-8', timeout: 10000 }, (error, stdout) => {
+        if (error) {
+          if (error.code === 1) resolve('(no matches)');
+          else resolve('Error: ' + (error.message || '执行失败'));
+        } else {
+          resolve(stdout || '(no matches)');
+        }
+      });
+    });
   }
 
   return 'Unknown tool: ' + cmd + '\n可用工具: ls, dir, read, grep';

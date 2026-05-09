@@ -43,6 +43,10 @@ export class StreamRenderer {
   private codeLang = '';
   private fullText = '';
   private firstToken = true;
+  private inlinePending = '';
+  private flushTimer: NodeJS.Timeout | null = null;
+  private static readonly FLUSH_INTERVAL = 16; // ms
+  private static readonly FLUSH_THRESHOLD = 64; // chars
 
   /** Feed a token from the stream */
   push(token: string): void {
@@ -53,6 +57,7 @@ export class StreamRenderer {
 
   /** Finalize and flush remaining content */
   finish(): string {
+    this.flushInline();
     // Flush any remaining line buffer
     if (this.lineBuffer) {
       this.flushLine(this.lineBuffer);
@@ -85,27 +90,46 @@ export class StreamRenderer {
     }
   }
 
-  /** Stream partial text inline (no newline yet) */
+  /** Stream partial text inline (no newline yet) — buffered to reduce I/O */
   private streamInline(text: string): void {
     if (!text) return;
     if (this.firstToken) {
       this.firstToken = false;
-      console.log(chalk.bold.green('\n  AI'));
-      printDivider();
+      this.inlinePending += chalk.bold.green('\n  AI') + '\n' + chalk.gray('  ' + '─'.repeat(56)) + '\n';
     }
     if (this.inCodeBlock) {
-      // Inside code block, stream green
-      if (!this.lineBuffer) process.stdout.write(chalk.gray('  │ '));
-      process.stdout.write(chalk.green(text));
+      if (!this.lineBuffer) this.inlinePending += chalk.gray('  │ ');
+      this.inlinePending += chalk.green(text);
     } else {
-      // Normal text — stream with inline rendering
-      if (!this.lineBuffer) process.stdout.write('  ');
-      process.stdout.write(text);
+      if (!this.lineBuffer) this.inlinePending += '  ';
+      this.inlinePending += text;
+    }
+    if (this.inlinePending.length >= StreamRenderer.FLUSH_THRESHOLD) {
+      this.flushInline();
+    } else {
+      this.scheduleFlush();
+    }
+  }
+
+  private scheduleFlush(): void {
+    if (this.flushTimer) return;
+    this.flushTimer = setTimeout(() => this.flushInline(), StreamRenderer.FLUSH_INTERVAL);
+  }
+
+  private flushInline(): void {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    if (this.inlinePending) {
+      process.stdout.write(this.inlinePending);
+      this.inlinePending = '';
     }
   }
 
   /** Handle a complete line */
   private handleCompleteLine(line: string): void {
+    this.flushInline();
     if (this.firstToken) {
       this.firstToken = false;
       console.log(chalk.bold.green('\n  AI'));
@@ -205,7 +229,7 @@ export class Spinner {
       const f = SPINNER_FRAMES[this.frame % SPINNER_FRAMES.length];
       process.stdout.write(`\r${chalk.cyan(f)} ${chalk.gray(this.text + '...')}`);
       this.frame++;
-    }, 80);
+    }, 160);
   }
 
   /** Update spinner text while running */

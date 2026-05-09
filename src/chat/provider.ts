@@ -1,6 +1,14 @@
 import * as https from 'https';
 import { ChatMessage, ModelInfo } from '../types';
 
+// Shared agent with keep-alive for connection reuse, limited sockets
+const sharedAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 3,
+  maxFreeSockets: 1,
+  timeout: 30000,
+});
+
 interface StreamCallbacks {
   onToken: (token: string) => void;
   onDone: (full: string) => void;
@@ -59,6 +67,7 @@ export function streamChat(
     hostname: provider.hostname,
     path: provider.path,
     method: 'POST',
+    agent: sharedAgent,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ' + provider.key,
@@ -142,6 +151,10 @@ export function streamChat(
   });
 
   req.on('error', (e) => callbacks.onError(e));
+  req.setTimeout(30000, () => {
+    req.destroy();
+    callbacks.onError(new Error('请求超时 (30s)'));
+  });
   req.write(data);
   req.end();
 }
@@ -169,6 +182,7 @@ export function chatComplete(messages: ChatMessage[], model: ModelInfo, tools?: 
       hostname: provider.hostname,
       path: provider.path,
       method: 'POST',
+      agent: sharedAgent,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + provider.key,
@@ -192,6 +206,10 @@ export function chatComplete(messages: ChatMessage[], model: ModelInfo, tools?: 
     });
 
     req.on('error', reject);
+    req.setTimeout(30000, () => {
+      req.destroy();
+      reject(new Error('请求超时 (30s)'));
+    });
     req.write(data);
     req.end();
   });

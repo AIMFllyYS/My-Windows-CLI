@@ -1,6 +1,14 @@
 import * as https from 'https';
 import { SearchResult, WebSearchResponse } from '../types';
 
+// Shared agent for search API (keep-alive)
+const searchAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 2,
+  maxFreeSockets: 1,
+  timeout: 30000,
+});
+
 /**
  * ZhiPu Web Search API - standalone search tool
  * POST https://open.bigmodel.cn/api/paas/v4/web_search
@@ -24,6 +32,7 @@ export function webSearch(query: string, count: number = 5): Promise<SearchResul
       hostname: 'open.bigmodel.cn',
       path: '/api/paas/v4/web_search',
       method: 'POST',
+      agent: searchAgent,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + apiKey,
@@ -53,6 +62,10 @@ export function webSearch(query: string, count: number = 5): Promise<SearchResul
     });
 
     req.on('error', reject);
+    req.setTimeout(30000, () => {
+      req.destroy();
+      reject(new Error('搜索请求超时 (30s)'));
+    });
     req.write(data);
     req.end();
   });

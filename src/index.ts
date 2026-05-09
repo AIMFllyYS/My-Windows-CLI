@@ -5,6 +5,16 @@ import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import * as v8 from 'v8';
+import { exec } from 'child_process';
+
+// Limit memory footprint to avoid impacting other apps
+v8.setFlagsFromString('--max-old-space-size=64');
+
+// Lower process priority on Windows so CLI never hogs CPU
+if (process.platform === 'win32') {
+  exec(`wmic process where processid=${process.pid} CALL setpriority "below normal"`, { windowsHide: true });
+}
 
 // Load .env from project root (not cwd)
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
