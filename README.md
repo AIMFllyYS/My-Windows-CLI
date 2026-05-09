@@ -25,7 +25,8 @@
 | 🐙 **GitHub Status** - View recent issues and auth commands | GitHub 状态 - 查看最新 Issues 和认证命令 |
 | ⚡ **AI CLI Reference** - Commands for Claude, Kiro, Codex, Gemini, Cursor | AI CLI 参考 - Claude, Kiro, Codex, Gemini, Cursor 命令 |
 | 🚀 **App Launcher** - Quick launch commands for common apps | 应用启动 - 常用应用的快速启动命令 |
-| 🤖 **AI Chat Mode** - Interactive AI conversation with DeepSeek | AI 对话模式 - 与 DeepSeek 的交互式 AI 对话 |
+| 🤖 **AI Chat Mode** - Interactive AI conversation with DeepSeek/GLM | AI 对话模式 - 与 DeepSeek/智谱 GLM 的交互式 AI 对话 |
+| 🧹 **Clear** - AI-assisted cleanup of useless processes & C drive | AI 辅助清理 - 无用进程清理 + C 盘清理 |
 
 ## 🚀 Quick Start | 快速开始
 
@@ -113,11 +114,39 @@ coding --ai
 coding --chat --model deepseek-chat
 ```
 
+### Clear Mode | 清理模式
+
+```bash
+# AI-assisted useless process cleanup | AI 辅助清理无用后台进程
+coding --clear -p
+coding --clear --process
+
+# AI-assisted C drive cleanup | AI 辅助 C 盘清理
+coding --clear -d
+coding --clear --drive
+
+# Both process + drive cleanup | 同时进行进程和硬盘清理
+coding --clear -a
+coding --clear --all
+
+# Shortcut | 快捷方式
+coding --clear-a
+```
+
+> **Clear Features | 清理特性**
+> - 🤖 AI analyzes which processes/files are safe to remove
+> - 🛡️ Local whitelist protects system-critical processes
+> - ✅ User confirmation before any deletion
+> - 📝 Detailed logs saved to `scripts/logs/`
+> - 🧹 C drive: Conservative / Aggressive dual modes
+
 > **AI Chat Features | AI 对话特性**
 > - 🔒 Read-only mode - Cannot edit/create/delete files
 > - 🛠️ Available tools: `ls`, `dir`, `Read`, `Grep`, `WebSearch`
+> - 🔍 Built-in web search with auto AI summarization
+> - 🧠 Multiple models: DeepSeek V4, GLM-4.7/4.5/5
 > - 💬 Multi-turn conversations
-> - 🌐 Uses DeepSeek API
+> - 🌐 Uses DeepSeek / ZhiPu API
 
 ## 📋 Supported AI CLI Tools | 支持的 AI CLI 工具
 
@@ -138,6 +167,9 @@ Create a `.env` file based on `.env.example`:
 ```bash
 # DeepSeek API Key (required for AI chat)
 DEEPSEEK_API_KEY=your_api_key_here
+
+# ZhiPu API Key (required for web search and GLM models)
+ZHIPU_API_KEY=your_api_key_here
 
 # GitHub Token (optional, for GitHub features)
 # Can also be read from ~/project/1037Solo/StudySolo-Dev/backend/.env
@@ -177,16 +209,26 @@ My-Windows-CLI/
 │   │   │   ├── auth.ts       # Account management & switching
 │   │   │   ├── issues.ts     # Issues fetching
 │   │   │   └── index.ts      # Module exports
+│   │   ├── clear/            # AI-assisted cleanup (process + drive)
+│   │   │   ├── process.ts    # Process cleanup
+│   │   │   ├── drive.ts      # C drive cleanup
+│   │   │   ├── scan.ts       # Process scanning
+│   │   │   ├── ai-filter.ts  # AI judgment
+│   │   │   ├── kill.ts       # Process termination
+│   │   │   ├── logger.ts     # Cleanup logs
+│   │   │   └── index.ts      # Unified entry
 │   │   ├── paths.ts          # Project path scanning
 │   │   ├── cli.ts            # AI CLI commands reference
 │   │   ├── apps.ts           # App launch commands
-│   │   └── chat.ts           # AI chat (DeepSeek)
+│   │   └── chat/             # AI chat (DeepSeek / ZhiPu)
 │   ├── utils/
 │   │   ├── config.ts         # Shared config management
 │   │   └── selector.ts       # Interactive terminal selector
 │   └── types/                # TypeScript type definitions
 ├── scripts/
 │   ├── create_shortcut.ps1   # Windows startup shortcut
+│   ├── clean-c-drive.ps1     # C drive cleanup PowerShell script
+│   ├── logs/                 # Cleanup logs (git-ignored)
 │   └── tmp/                  # Temporary files (git-ignored)
 ├── package.json
 ├── tsconfig.json
@@ -212,7 +254,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [Anthropic Claude Code](https://docs.anthropic.com/en/docs/claude-code) - AI coding assistant
 - [DeepSeek](https://www.deepseek.com/) - LLM API provider
+- [ZhiPu AI](https://www.zhipu.ai/) - GLM model API provider
 - [pkg](https://github.com/vercel/pkg) - Package Node.js apps
+- 乐事学长 - C drive cleanup PowerShell script source
 
 ---
 

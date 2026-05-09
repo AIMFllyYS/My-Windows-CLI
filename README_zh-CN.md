@@ -25,7 +25,8 @@
 | 🐙 **GitHub 状态** - 查看最新 Issues 和认证命令 | GitHub 集成 |
 | ⚡ **AI CLI 参考** - Claude, Kiro, Codex, Gemini, Cursor 命令 | AI CLI 参考 |
 | 🚀 **应用启动** - 常用应用的快速启动命令 | 应用启动器 |
-| 🤖 **AI 对话模式** - 与 DeepSeek 的交互式 AI 对话 | AI 聊天 |
+| 🤖 **AI 对话模式** - 与 DeepSeek/智谱 GLM 的交互式 AI 对话 | AI 聊天 |
+| 🧹 **AI 辅助清理** - 无用进程清理 + C 盘清理 | 系统清理 |
 
 ## 🚀 快速开始
 
@@ -113,11 +114,39 @@ coding --ai
 coding --chat --model deepseek-chat
 ```
 
+### 清理模式
+
+```bash
+# AI 辅助清理无用后台进程
+coding --clear -p
+coding --clear --process
+
+# AI 辅助 C 盘清理
+coding --clear -d
+coding --clear --drive
+
+# 同时进行进程和硬盘清理
+coding --clear -a
+coding --clear --all
+
+# 快捷方式
+coding --clear-a
+```
+
+> **清理特性**
+> - 🤖 AI 分析哪些进程/文件可以安全清理
+> - 🛡️ 本地白名单保护系统关键进程
+> - ✅ 删除前必须用户确认
+> - 📝 详细日志保存到 `scripts/logs/`
+> - 🧹 C 盘：保守 / 激进 双模式
+
 > **AI 对话特性**
 > - 🔒 只读模式 - 无法编辑/创建/删除文件
 > - 🛠️ 可用工具：`ls`、`dir`、`Read`、`Grep`、`WebSearch`
+> - 🔍 内置网络搜索 + AI 自动总结
+> - 🧠 多模型支持：DeepSeek V4、GLM-4.7/4.5/5
 > - 💬 多轮对话
-> - 🌐 使用 DeepSeek API
+> - 🌐 使用 DeepSeek / 智谱 API
 
 ## 📋 支持的 AI CLI 工具
 
@@ -138,6 +167,9 @@ coding --chat --model deepseek-chat
 ```bash
 # DeepSeek API 密钥（AI 对话必需）
 DEEPSEEK_API_KEY=your_api_key_here
+
+# 智谱 API 密钥（网络搜索和 GLM 模型必需）
+ZHIPU_API_KEY=your_api_key_here
 
 # GitHub Token（可选，用于 GitHub 功能）
 # 也可以从 ~/project/1037Solo/StudySolo-Dev/backend/.env 读取
@@ -177,16 +209,26 @@ My-Windows-CLI/
 │   │   │   ├── auth.ts       # 账号管理和切换
 │   │   │   ├── issues.ts     # Issues 查询
 │   │   │   └── index.ts      # 模块导出
+│   │   ├── clear/            # AI 辅助清理
+│   │   │   ├── process.ts    # 进程清理
+│   │   │   ├── drive.ts      # C 盘清理
+│   │   │   ├── scan.ts       # 进程扫描
+│   │   │   ├── ai-filter.ts  # AI 判断
+│   │   │   ├── kill.ts       # 进程终止
+│   │   │   ├── logger.ts     # 清理日志
+│   │   │   └── index.ts      # 统一入口
 │   │   ├── paths.ts          # 项目路径扫描
 │   │   ├── cli.ts            # AI CLI 命令参考
 │   │   ├── apps.ts           # 应用启动命令
-│   │   └── chat.ts           # AI 对话 (DeepSeek)
+│   │   └── chat/             # AI 对话 (DeepSeek / 智谱)
 │   ├── utils/
 │   │   ├── config.ts         # 共享配置管理
 │   │   └── selector.ts       # 交互式终端选择器
 │   └── types/                # TypeScript 类型定义
 ├── scripts/
 │   ├── create_shortcut.ps1   # Windows 开机启动快捷方式
+│   ├── clean-c-drive.ps1     # C 盘清理 PowerShell 脚本
+│   ├── logs/                 # 清理日志 (不追踪 git)
 │   └── tmp/                  # 临时文件 (不追踪 git)
 ├── package.json
 ├── tsconfig.json
@@ -212,7 +254,9 @@ My-Windows-CLI/
 
 - [Anthropic Claude Code](https://docs.anthropic.com/en/docs/claude-code) - AI 编程助手
 - [DeepSeek](https://www.deepseek.com/) - LLM API 提供商
+- [智谱 AI](https://www.zhipu.ai/) - GLM 模型 API 提供商
 - [pkg](https://github.com/vercel/pkg) - Node.js 应用打包工具
+- 乐事学长 - C 盘清理 PowerShell 脚本源代码
 
 ---
 
