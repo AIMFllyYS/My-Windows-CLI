@@ -3,14 +3,18 @@
 export interface ModelInfo {
   id: string;
   name: string;
-  provider: 'deepseek' | 'zhipu';
+  provider: 'deepseek' | 'zhipu' | 'custom';
   description: string;
   supportsSearch?: boolean;
+  contextLength?: number;
+  modalities?: string[];
 }
 
 export interface ProviderConfig {
   name: string;
+  protocol?: 'http:' | 'https:';
   hostname: string;
+  port?: string;
   path: string;
   key: string;
   modelId: string;

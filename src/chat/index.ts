@@ -1,15 +1,23 @@
 import * as readline from 'readline';
 import chalk from 'chalk';
 import { ChatMessage, ModelInfo } from '../types';
-import { MODELS, DEFAULT_MODEL_ID, getModelById } from './models';
+import { MODELS, DEFAULT_MODEL_ID, getAvailableModels, getModelById } from './models';
 import { streamChat } from './provider';
 import { webSearch } from './search';
 import { executeTool, getSystemPrompt, isToolCommand } from './tools';
 import { Spinner, drawBox, printSuccess, printError, printInfo, printWarning, printDivider, StreamRenderer } from './renderer';
 import { interactiveSelect } from '../utils/selector';
+import { parseAiEnv, resolveEnvPath, writeAiSettings } from './config';
+import { parseSlashCommand, resolveModelCommand } from './commands';
 
-export async function startChat(modelId?: string): Promise<void> {
-  let currentModel = getModelById(modelId || DEFAULT_MODEL_ID) || MODELS[0];
+export interface StartChatOptions {
+  modelId?: string;
+  autoAccept?: boolean;
+}
+
+export async function startChat(options?: string | StartChatOptions): Promise<void> {
+  const startOptions = typeof options === 'string' ? { modelId: options } : (options || {});
+  let currentModel = getModelById(startOptions.modelId || DEFAULT_MODEL_ID) || MODELS[0];
   const messages: ChatMessage[] = [{ role: 'system', content: getSystemPrompt() }];
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -18,7 +26,7 @@ export async function startChat(modelId?: string): Promise<void> {
   // Welcome banner
   console.log('\n' + drawBox(
     '🤖 Coding AI Chat',
-    `只读安全模式 · ${currentModel.name}`
+    `${startOptions.autoAccept ? 'Auto accept' : '只读安全模式'} · ${currentModel.name}`
   ));
   console.log('');
   printInfo('输入问题开始对话，输入 /help 查看命令');
@@ -74,11 +82,12 @@ async function handleCommand(
   input: string,
   currentModel: ModelInfo,
   messages: ChatMessage[],
-  _rl: readline.Interface
+  rl: readline.Interface
 ): Promise<'exit' | 'continue' | CommandResult> {
-  const parts = input.split(/\s+/);
-  const cmd = parts[0].toLowerCase();
-  const args = parts.slice(1).join(' ');
+  const parsed = parseSlashCommand(input);
+  if (!parsed) return 'continue';
+  const cmd = parsed.command;
+  const args = parsed.args;
 
   switch (cmd) {
     case '/exit':
@@ -94,7 +103,29 @@ async function handleCommand(
 
     case '/model':
     case '/m':
+      {
+        const modelCommand = resolveModelCommand(args);
+        if (modelCommand.kind === 'info') {
+          printModelInfo(currentModel);
+          return 'continue';
+        }
+        if (modelCommand.kind === 'select') {
+          const selected = getModelById(modelCommand.modelId);
+          if (!selected) {
+            printWarning('未知模型: ' + modelCommand.modelId);
+            return 'continue';
+          }
+          if (selected.provider === 'custom') process.env.AI_MODEL = selected.id;
+          printSuccess(`已切换到 ${selected.name}`);
+          return { model: selected };
+        }
+      }
       return await switchModel(currentModel);
+
+    case '/setting':
+    case '/settings':
+      await configureAiSettings(rl);
+      return 'continue';
 
     case '/clear':
     case '/c':
@@ -119,6 +150,37 @@ async function handleCommand(
       printWarning('未知命令: ' + cmd + '，输入 /help 查看帮助');
       return 'continue';
   }
+}
+
+function askLine(rl: readline.Interface, prompt: string): Promise<string> {
+  return new Promise((resolve) => rl.question(prompt, resolve));
+}
+
+async function configureAiSettings(rl: readline.Interface): Promise<void> {
+  const current = parseAiEnv(process.env);
+  console.log('');
+  console.log(chalk.bold.cyan('  AI 设置'));
+  printDivider();
+  const baseUrl = (await askLine(rl, chalk.cyan(`  URL [${current.baseUrl || 'https://api.example.com/v1'}]: `))).trim() || current.baseUrl;
+  const apiKey = (await askLine(rl, chalk.cyan(`  API Key [${current.apiKey ? '已配置' : '空'}]: `))).trim() || current.apiKey;
+  const modelInput = (await askLine(rl, chalk.cyan(`  Model ID（英文逗号分隔） [${current.modelIds.join(',') || 'model-id'}]: `))).trim();
+  const modelIds = (modelInput || current.modelIds.join(','))
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (!baseUrl || !apiKey || modelIds.length === 0) {
+    printWarning('URL、API Key 和 Model ID 都不能为空');
+    return;
+  }
+
+  const activeModelId = modelIds.includes(current.activeModelId) ? current.activeModelId : modelIds[0];
+  writeAiSettings(resolveEnvPath(), { baseUrl, apiKey, modelIds, activeModelId });
+  process.env.AI_BASE_URL = baseUrl;
+  process.env.AI_API_KEY = apiKey;
+  process.env.AI_MODELS = modelIds.join(',');
+  process.env.AI_MODEL = activeModelId;
+  printSuccess(`AI 设置已保存，当前模型 ${activeModelId}`);
 }
 
 function printHelp(): void {
@@ -156,7 +218,8 @@ async function switchModel(current: ModelInfo): Promise<'continue' | CommandResu
   console.log(chalk.bold.cyan('  🔄 选择模型'));
   printDivider();
 
-  const options = MODELS.map(m => ({
+  const availableModels = getAvailableModels();
+  const options = availableModels.map(m => ({
     label: `${m.name}${m.id === current.id ? chalk.green(' (当前)') : ''}`,
     value: m.id,
     description: `${m.description}${m.supportsSearch ? ' 🔍' : ''}`,
@@ -174,6 +237,9 @@ async function switchModel(current: ModelInfo): Promise<'continue' | CommandResu
   });
 
   if (selected) {
+    if ((selected as ModelInfo).provider === 'custom') {
+      process.env.AI_MODEL = (selected as ModelInfo).id;
+    }
     printSuccess(`已切换到 ${(selected as ModelInfo).name}`);
     return { model: selected };
   }

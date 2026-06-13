@@ -58,6 +58,7 @@ function renderChineseHelp(): string {
     '  -C, --chat                启动 AI 对话模式',
     '  -A, --ai                  启动 AI 对话模式（--chat 别名）',
     '  -m, --model <model>       指定 AI 模型（默认 deepseek-chat）',
+    '  --auto-accept             AI Agent 自动接受权限确认',
     '  --install [tool]          安装 AI CLI、AI IDE 或环境工具',
     '  --skills                  打开 skills 市场',
     '  --clear                   启用清理模式',
@@ -98,6 +99,7 @@ program
   .option('-C, --chat', '启动 AI 对话模式')
   .option('-A, --ai', '启动 AI 对话模式（--chat 别名）')
   .option('-m, --model <model>', '指定 AI 模型（默认 deepseek-chat）')
+  .option('--auto-accept', 'AI Agent 自动接受权限确认')
   // Installer options
   .option('--install [tool]', '安装 AI CLI、AI IDE 或环境工具')
   .option('--skills', '打开 skills 市场')
@@ -151,7 +153,7 @@ program
 
     // AI Chat mode (takes priority)
     if (opts.chat || opts.ai) {
-      await startChat(opts.model);
+      await startChat({ modelId: opts.model, autoAccept: Boolean(opts.autoAccept) });
       return;
     }
 

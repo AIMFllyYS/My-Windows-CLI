@@ -1,8 +1,17 @@
+import * as http from 'http';
 import * as https from 'https';
 import { ChatMessage, ModelInfo } from '../types';
+import { parseAiEnv } from './config';
 
 // Shared agent with keep-alive for connection reuse, limited sockets
-const sharedAgent = new https.Agent({
+const sharedHttpsAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 3,
+  maxFreeSockets: 1,
+  timeout: 30000,
+});
+
+const sharedHttpAgent = new http.Agent({
   keepAlive: true,
   maxSockets: 3,
   maxFreeSockets: 1,
@@ -18,20 +27,24 @@ interface StreamCallbacks {
 
 interface ProviderSpec {
   name: string;
+  protocol?: 'http:' | 'https:';
   hostname: string;
+  port?: string;
   path: string;
   key: string;
   modelId: string;
 }
 
 export function getProviderConfig(model: Pick<ModelInfo, 'id' | 'provider'>): ProviderSpec {
-  const customBaseUrl = process.env.AI_BASE_URL || '';
-  const customKey = process.env.AI_API_KEY || '';
-  const customModel = process.env.AI_MODEL || '';
+  const settings = parseAiEnv(process.env);
+  const customBaseUrl = settings.baseUrl;
+  const customKey = settings.apiKey;
+  const customModel = settings.activeModelId;
+  const hasCustomOverride = Boolean(process.env.AI_BASE_URL || process.env.AI_API_KEY || process.env.AI_MODEL || model.provider === 'custom');
   const deepseekKey = process.env.DEEPSEEK_API_KEY || '';
   const zhipuKey = process.env.ZHIPU_API_KEY || '';
 
-  if (customBaseUrl || customKey || customModel) {
+  if (hasCustomOverride) {
     const parsed = new URL(customBaseUrl || 'https://api.openai.com/v1');
     let apiPath = parsed.pathname.replace(/\/$/, '');
     if (!apiPath.endsWith('/chat/completions')) {
@@ -39,8 +52,10 @@ export function getProviderConfig(model: Pick<ModelInfo, 'id' | 'provider'>): Pr
     }
     return {
       name: 'custom',
+      protocol: parsed.protocol as 'http:' | 'https:',
       hostname: parsed.hostname,
-      path: apiPath,
+      port: parsed.port,
+      path: apiPath + parsed.search,
       key: customKey,
       modelId: customModel || model.id,
     };
@@ -49,6 +64,7 @@ export function getProviderConfig(model: Pick<ModelInfo, 'id' | 'provider'>): Pr
   if (model.provider === 'zhipu') {
     return {
       name: 'zhipu',
+      protocol: 'https:',
       hostname: 'open.bigmodel.cn',
       path: '/api/paas/v4/chat/completions',
       key: zhipuKey,
@@ -57,11 +73,18 @@ export function getProviderConfig(model: Pick<ModelInfo, 'id' | 'provider'>): Pr
   }
   return {
     name: 'deepseek',
+    protocol: 'https:',
     hostname: 'api.deepseek.com',
     path: '/chat/completions',
     key: deepseekKey,
     modelId: model.id,
   };
+}
+
+function requestForProvider(provider: ProviderSpec) {
+  const requestModule = provider.protocol === 'http:' ? http : https;
+  const agent = provider.protocol === 'http:' ? sharedHttpAgent : sharedHttpsAgent;
+  return { request: requestModule.request, agent };
 }
 
 /**
@@ -94,11 +117,13 @@ export function streamChat(
 
   const data = JSON.stringify(body);
 
-  const req = https.request({
+  const transport = requestForProvider(provider);
+  const req = transport.request({
     hostname: provider.hostname,
+    port: provider.port,
     path: provider.path,
     method: 'POST',
-    agent: sharedAgent,
+    agent: transport.agent,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ' + provider.key,
@@ -209,11 +234,13 @@ export function chatComplete(messages: ChatMessage[], model: ModelInfo, tools?: 
     }
     const data = JSON.stringify(body);
 
-    const req = https.request({
+    const transport = requestForProvider(provider);
+    const req = transport.request({
       hostname: provider.hostname,
+      port: provider.port,
       path: provider.path,
       method: 'POST',
-      agent: sharedAgent,
+      agent: transport.agent,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + provider.key,
