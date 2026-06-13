@@ -5,7 +5,7 @@ import { MODELS, DEFAULT_MODEL_ID, getAvailableModels, getModelById } from './mo
 import { streamChat } from './provider';
 import { webSearch } from './search';
 import { executeTool, getSystemPrompt, isToolCommand } from './tools';
-import { Spinner, drawBox, printSuccess, printError, printInfo, printWarning, printDivider, StreamRenderer } from './renderer';
+import { Spinner, printSuccess, printError, printInfo, printWarning, printDivider, StreamRenderer } from './renderer';
 import { interactiveSelect } from '../utils/selector';
 import { parseAiEnv, resolveEnvPath, writeAiSettings } from './config';
 import { parseSlashCommand, resolveModelCommand } from './commands';
@@ -15,6 +15,8 @@ import { AiSessionState, createSessionState, setCurrentModel, setMode } from './
 import { ActiveRuntimeSkill, discoverRuntimeSkills, formatSkillContextMessage, formatSkillList, loadRuntimeSkillContent, resolveSkillSelection, RuntimeSkill, trimMessagesPreservingSkillContext, upsertSkillContextMessage } from './skills';
 import { createSubagentQueue, enqueueSubagent, cancelSubagent, formatSubagentList, resolveAgentCommand, runNextSubagent, setSubagentParentPermission } from './agent/subagents';
 import { SubagentQueue } from './agent/types';
+import { renderStatusHeader, renderTimelineEntry } from './ui/layout';
+import { formatPermissionDecision } from './permissions/prompts';
 
 const AI_SESSION_EXIT = '__HI_AI_SESSION_EXIT__';
 
@@ -116,12 +118,14 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
     },
   };
 
-  // Welcome banner
-  console.log('\n' + drawBox(
-    '🤖 Coding AI Chat',
-    `${session.mode} / ${session.permissionMode} · ${currentModel.name}`
-  ));
-  console.log('');
+  console.log(renderStatusHeader({
+    project: process.cwd().split(/[\\/]/).pop() || 'workspace',
+    mode: session.mode,
+    permissionMode: session.permissionMode,
+    model: currentModel.name,
+    activeSkills: session.activeSkillIds.length,
+    runningSubagents: session.subagents.items.filter((item) => item.status === 'running').length,
+  }));
   printInfo('输入问题开始对话，输入 /help 查看命令');
   printDivider();
 
@@ -145,7 +149,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
 
     // === Direct Tool Commands ===
     if (isToolCommand(input)) {
-      printInfo('执行工具...');
+      console.log(renderTimelineEntry({ kind: 'tool', status: 'running', label: input.split(/\s+/)[0], detail: input }));
       foregroundBusy = true;
       let result = '';
       try {
@@ -153,6 +157,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
       } finally {
         foregroundBusy = false;
       }
+      console.log(renderTimelineEntry({ kind: 'tool', status: result.startsWith('Error:') ? 'failed' : 'completed', label: input.split(/\s+/)[0], detail: input }));
       console.log(chalk.gray('\n  ┌── 工具结果 ──'));
       result.split('\n').forEach(l => console.log(chalk.gray('  │ ') + chalk.white(l)));
       console.log(chalk.gray('  └' + '─'.repeat(40)));
@@ -368,9 +373,9 @@ async function handleAgentCommand(
     try {
       const cancelled = cancelSubagent(hooks.subagents, command.id);
       if (cancelled.status === 'cancelled') {
-        printWarning(`Subagent ${cancelled.id} 已取消`);
+        console.log(renderTimelineEntry({ kind: 'subagent', status: 'cancelled', label: cancelled.id, detail: cancelled.prompt }));
       } else {
-        printInfo(`Subagent ${cancelled.id} 当前状态: ${cancelled.status}`);
+        console.log(renderTimelineEntry({ kind: 'subagent', status: cancelled.status, label: cancelled.id, detail: cancelled.prompt }));
       }
     } catch (error: any) {
       printWarning(error.message);
@@ -390,7 +395,11 @@ async function handleAgentCommand(
       skillIds: session.activeSkillIds,
       modelId: currentModel.id,
     });
-    printInfo(`Subagent ${task.id} 已加入队列`);
+    console.log(formatPermissionDecision({
+      decision: task.permissionMode === 'ask' ? 'ask' : 'allow',
+      reason: `subagent runs in ${task.permissionMode} permission mode`,
+    }, 'subagent'));
+    console.log(renderTimelineEntry({ kind: 'subagent', status: 'queued', label: task.id, detail: task.prompt }));
     runSubagentQueueInBackground(hooks);
     return;
   }
@@ -422,13 +431,12 @@ function runSubagentQueueInBackground(hooks: RuntimeHooks): void {
           }
         });
         const completed = await runNextSubagent(hooks.subagents);
-        if (completed.status === 'completed') {
-          printSuccess(`Subagent ${completed.id} 完成: ${completed.result?.summary || ''}`);
-        } else if (completed.status === 'cancelled') {
-          printWarning(`Subagent ${completed.id} 已取消`);
-        } else {
-          printWarning(`Subagent ${completed.id} ${completed.status}: ${completed.error || ''}`);
-        }
+        console.log(renderTimelineEntry({
+          kind: 'subagent',
+          status: completed.status,
+          label: completed.id,
+          detail: completed.result?.summary || completed.error || completed.prompt,
+        }));
       }
     } finally {
       hooks.setSubagentActiveWork(null);
