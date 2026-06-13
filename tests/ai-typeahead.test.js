@@ -62,6 +62,7 @@ test('slash suggestion helpers detect mid-input commands and best matches', () =
     applyMidInputSlashCompletion,
     findMidInputSlashCommand,
     findSlashCommandPositions,
+    getMidInputSlashGhostText,
     getBestSlashCommandMatch,
   } = require('../dist/chat/typeahead');
 
@@ -75,6 +76,13 @@ test('slash suggestion helpers detect mid-input commands and best matches', () =
     suffix: 'n',
     fullCommand: '/plan',
   });
+  assert.deepEqual(getMidInputSlashGhostText('please /pla', 11, 'agent'), {
+    text: 'n',
+    fullCommand: '/plan',
+    insertPosition: 11,
+  });
+  assert.equal(getMidInputSlashGhostText('/pla', 4, 'agent'), null);
+  assert.equal(getMidInputSlashGhostText('open /usr/bin', 9, 'agent'), null);
   assert.deepEqual(applyMidInputSlashCompletion('please /pla', 11, 'agent'), {
     input: 'please /plan ',
     cursorOffset: 13,
@@ -257,6 +265,32 @@ test('slash prompt applies mid-input slash completion on tab', async () => {
   input.emit('keypress', undefined, { name: 'return' });
 
   assert.equal(await pending, 'please /plan ');
+});
+
+test('slash prompt renders mid-input ghost text without submitting it', async () => {
+  const { promptWithSlashTypeahead } = require('../dist/chat/typeahead');
+  const input = new EventEmitter();
+  input.isRaw = false;
+  input.setRawMode = () => undefined;
+  input.resume = () => undefined;
+  const writes = [];
+  const output = { write: (chunk) => { writes.push(String(chunk)); } };
+
+  const pending = promptWithSlashTypeahead({
+    prompt: '> ',
+    mode: 'agent',
+    input,
+    output,
+  });
+
+  for (const char of 'please /pla') {
+    input.emit('keypress', char, { name: undefined });
+  }
+  input.emit('keypress', undefined, { name: 'return' });
+
+  const rendered = writes.join('').replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+  assert.match(rendered, /please \/plan/);
+  assert.equal(await pending, 'please /pla');
 });
 
 test('slash prompt abort cleans up keypress listener and resolves pending input', async () => {

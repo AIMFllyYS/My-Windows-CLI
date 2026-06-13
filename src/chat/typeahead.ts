@@ -147,6 +147,24 @@ export function getBestSlashCommandMatch(
   return suffix ? { suffix, fullCommand: match.command } : null;
 }
 
+export function getMidInputSlashGhostText(
+  input: string,
+  cursorOffset: number,
+  mode: AiMode,
+): { text: string; fullCommand: string; insertPosition: number } | null {
+  const midInput = findMidInputSlashCommand(input, cursorOffset);
+  if (!midInput) return null;
+
+  const match = getBestSlashCommandMatch(midInput.partialCommand, mode);
+  if (!match) return null;
+
+  return {
+    text: match.suffix,
+    fullCommand: match.fullCommand,
+    insertPosition: cursorOffset,
+  };
+}
+
 export function applyMidInputSlashCompletion(
   input: string,
   cursorOffset: number,
@@ -237,6 +255,11 @@ export function promptWithSlashTypeahead(options: SlashPromptOptions): Promise<s
   const render = () => {
     clearSuggestions();
     output.write(`\r\x1B[2K${options.prompt}${value}`);
+    const ghost = getMidInputSlashGhostText(value, value.length, options.mode);
+    if (ghost && !state.active) {
+      output.write(chalk.gray(ghost.text));
+      output.write(`\x1B[${ghost.text.length}D`);
+    }
     const rendered = renderSlashTypeahead(state);
     if (rendered) {
       const lines = rendered.split('\n');
