@@ -1,29 +1,62 @@
 import chalk from 'chalk';
-import { interactiveSelect } from '../../utils/selector';
-import { DEFAULT_GUIDE_KEY, GUIDE_CHAPTERS, renderGuideChapter } from './chapters';
+import { SelectorOption, interactiveSelect } from '../../utils/selector';
+import { DEFAULT_GUIDE_KEY, GUIDE_CHAPTERS, getGuideChapter, renderGuideChapter } from './chapters';
 
 export { DEFAULT_GUIDE_KEY, GUIDE_CHAPTERS, renderGuideChapter };
 
-export async function handleGuide(): Promise<void> {
-  console.log(chalk.cyan(renderGuideChapter(DEFAULT_GUIDE_KEY)));
+export function getGuideMenuOptions(currentKey: string): SelectorOption[] {
+  return GUIDE_CHAPTERS
+    .filter((chapter) => chapter.key !== currentKey)
+    .map((chapter) => ({
+      label: chapter.key === DEFAULT_GUIDE_KEY ? `主章节：${chapter.title}` : chapter.title,
+      value: chapter.key,
+      description: chapter.summary,
+    }));
+}
 
-  const chapters = GUIDE_CHAPTERS.filter((chapter) => chapter.key !== DEFAULT_GUIDE_KEY);
+function getGuideMenuTitle(currentKey: string): string {
+  if (currentKey === DEFAULT_GUIDE_KEY) {
+    return '选择下一章节（Esc 退出）';
+  }
+  return `当前章节：${getGuideChapter(currentKey).title}；选择其他章节（Esc 退出）`;
+}
+
+function printChapter(key: string): void {
+  console.log(chalk.cyan(renderGuideChapter(key)));
+}
+
+function printNonInteractiveMenu(currentKey: string): void {
+  console.log(chalk.gray('\n继续学习章节：'));
+  getGuideMenuOptions(currentKey).forEach((option) => {
+    console.log(chalk.gray(`- ${option.label}`));
+  });
+}
+
+export async function handleGuide(): Promise<void> {
+  let currentKey = DEFAULT_GUIDE_KEY;
+  printChapter(currentKey);
+
   if (!process.stdin.isTTY) {
-    console.log(chalk.gray('\n继续学习章节：'));
-    chapters.forEach((chapter) => console.log(chalk.gray(`- ${chapter.title}`)));
+    printNonInteractiveMenu(currentKey);
     return;
   }
 
-  await interactiveSelect({
-    title: '选择下一章节',
-    options: chapters.map((chapter) => ({
-      label: chapter.title,
-      value: chapter.key,
-      description: chapter.summary,
-    })),
-    onSelect: (value) => {
-      console.log('');
-      console.log(chalk.cyan(renderGuideChapter(value)));
-    },
-  });
+  while (true) {
+    let selectedKey = '';
+    await interactiveSelect({
+      title: getGuideMenuTitle(currentKey),
+      options: getGuideMenuOptions(currentKey),
+      onSelect: (value) => {
+        selectedKey = value;
+      },
+      onCancel: () => {
+        selectedKey = '';
+      },
+    });
+
+    if (!selectedKey) return;
+    currentKey = selectedKey;
+    console.log('');
+    printChapter(currentKey);
+  }
 }

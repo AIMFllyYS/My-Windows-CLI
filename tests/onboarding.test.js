@@ -17,6 +17,19 @@ test('default guide explains CLI onboarding in plain Chinese', () => {
   assert.ok(keys.includes('community'));
 });
 
+test('guide menu keeps three switch targets and shows main chapter away from intro', () => {
+  const { DEFAULT_GUIDE_KEY, getGuideMenuOptions } = require('../dist/modules/guide');
+
+  const introOptions = getGuideMenuOptions(DEFAULT_GUIDE_KEY);
+  assert.equal(introOptions.length, 3);
+  assert.deepEqual(introOptions.map((option) => option.value).sort(), ['cc-switch', 'community', 'vpn']);
+
+  const ccSwitchOptions = getGuideMenuOptions('cc-switch');
+  assert.equal(ccSwitchOptions.length, 3);
+  assert.ok(ccSwitchOptions.some((option) => option.value === DEFAULT_GUIDE_KEY && option.label.includes('主章节')));
+  assert.ok(!ccSwitchOptions.some((option) => option.value === 'cc-switch'));
+});
+
 test('help exposes state, api, and pay routes', () => {
   const help = execFileSync('node', ['dist/index.js', '--help'], { encoding: 'utf8' });
 
