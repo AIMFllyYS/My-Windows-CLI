@@ -163,3 +163,53 @@ test('relative permission paths are resolved against workspace root', () => {
     process.chdir(originalCwd);
   }
 });
+
+test('session permission rules are scoped to path or command prefix', () => {
+  const { decidePermission, rememberSessionPermissionRule } = require('../dist/chat/permissions/engine');
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-permission-rule-'));
+  fs.writeFileSync(path.join(workspace, 'allowed.txt'), 'ok', 'utf8');
+  fs.writeFileSync(path.join(workspace, 'other.txt'), 'ok', 'utf8');
+  const session = {};
+
+  rememberSessionPermissionRule(session, {
+    toolName: 'write_file',
+    pathPrefix: path.join(workspace, 'allowed.txt'),
+  });
+  rememberSessionPermissionRule(session, {
+    toolName: 'shell',
+    commandPrefix: 'npm run',
+  });
+
+  assert.equal(decidePermission(request({
+    mode: 'agent',
+    permissionMode: 'ask',
+    workspaceRoot: workspace,
+    tool: { name: 'write_file', kind: 'write' },
+    input: { path: 'allowed.txt' },
+    session,
+  })).decision, 'allow');
+  assert.equal(decidePermission(request({
+    mode: 'agent',
+    permissionMode: 'ask',
+    workspaceRoot: workspace,
+    tool: { name: 'write_file', kind: 'write' },
+    input: { path: 'other.txt' },
+    session,
+  })).decision, 'ask');
+  assert.equal(decidePermission(request({
+    mode: 'agent',
+    permissionMode: 'ask',
+    workspaceRoot: workspace,
+    tool: { name: 'shell', kind: 'shell' },
+    input: { command: 'npm run build' },
+    session,
+  })).decision, 'allow');
+  assert.equal(decidePermission(request({
+    mode: 'agent',
+    permissionMode: 'ask',
+    workspaceRoot: workspace,
+    tool: { name: 'shell', kind: 'shell' },
+    input: { command: 'git status' },
+    session,
+  })).decision, 'ask');
+});

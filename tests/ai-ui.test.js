@@ -137,3 +137,13 @@ test('chat runtime wires agent mode through tool-call loop', () => {
   assert.match(source, /buildProviderToolSpecs/);
   assert.match(source, /session\.mode === 'agent'/);
 });
+
+test('chat runtime wires permission dialog choices into agent ask mode', () => {
+  const source = fs.readFileSync('src/chat/index.ts', 'utf8');
+
+  assert.match(source, /formatPermissionPromptOptions/);
+  assert.match(source, /parsePermissionPromptChoice/);
+  assert.match(source, /applyPermissionPromptChoice/);
+  assert.match(source, /permissionSession/);
+  assert.match(source, /askLine/);
+});

@@ -13,6 +13,14 @@ export interface PermissionDecision {
 export interface SessionPermissionMemory {
   allowedTools?: Set<string>;
   deniedTools?: Set<string>;
+  allowedRules?: SessionPermissionRule[];
+  deniedRules?: SessionPermissionRule[];
+}
+
+export interface SessionPermissionRule {
+  toolName: string;
+  pathPrefix?: string;
+  commandPrefix?: string;
 }
 
 export interface PermissionRequest {
@@ -94,6 +102,37 @@ export function rememberSessionDecision(
   state.deniedTools.add(decision.toolName);
 }
 
+export function rememberSessionPermissionRule(
+  state: SessionPermissionMemory,
+  rule: SessionPermissionRule & { decision?: 'allow' | 'deny' }
+): void {
+  const normalized: SessionPermissionRule = {
+    toolName: rule.toolName,
+    pathPrefix: rule.pathPrefix ? path.resolve(rule.pathPrefix) : undefined,
+    commandPrefix: rule.commandPrefix,
+  };
+  if (rule.decision === 'deny') {
+    state.deniedRules ||= [];
+    state.deniedRules.push(normalized);
+    return;
+  }
+  state.allowedRules ||= [];
+  state.allowedRules.push(normalized);
+}
+
+function matchesSessionRule(request: PermissionRequest, rule: SessionPermissionRule): boolean {
+  if (rule.toolName !== request.tool.name) return false;
+  if (rule.pathPrefix) {
+    const target = resolveWorkspacePath(request.workspaceRoot, request.input?.path);
+    return isInsidePath(rule.pathPrefix, target);
+  }
+  if (rule.commandPrefix) {
+    const command = typeof request.input?.command === 'string' ? request.input.command : '';
+    return command.startsWith(rule.commandPrefix);
+  }
+  return false;
+}
+
 export function decidePermission(request: PermissionRequest): PermissionDecision {
   let tool: ToolDefinition;
   try {
@@ -126,6 +165,12 @@ export function decidePermission(request: PermissionRequest): PermissionDecision
   }
   if (request.session?.deniedTools?.has(request.tool.name)) {
     return { decision: 'deny', reason: 'tool denied for this session' };
+  }
+  if (request.session?.deniedRules?.some((rule) => matchesSessionRule(request, rule))) {
+    return { decision: 'deny', reason: 'operation denied for this session' };
+  }
+  if (request.session?.allowedRules?.some((rule) => matchesSessionRule(request, rule))) {
+    return { decision: 'allow', reason: 'operation allowed for this session' };
   }
   if (request.session?.allowedTools?.has(request.tool.name)) {
     return { decision: 'allow', reason: 'tool allowed for this session' };

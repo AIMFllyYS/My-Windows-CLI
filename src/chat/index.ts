@@ -17,7 +17,8 @@ import { createSubagentQueue, enqueueSubagent, cancelSubagent, formatSubagentLis
 import { SubagentQueue } from './agent/types';
 import { runAgentTurn } from './agent/loop';
 import { renderPermissionBox, renderStatusHeader, renderTimelineEntry } from './ui/layout';
-import { formatPermissionDecision } from './permissions/prompts';
+import { SessionPermissionMemory } from './permissions/engine';
+import { applyPermissionPromptChoice, formatPermissionDecision, formatPermissionPromptOptions, parsePermissionPromptChoice } from './permissions/prompts';
 import { buildProviderToolSpecs } from './tools/registry';
 import { promptWithSlashTypeahead } from './typeahead';
 
@@ -45,6 +46,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
   });
   const syncSkillContext = (): void => upsertSkillContextMessage(messages, formatSkillContextMessage(activeSkills()));
   const messages: ChatMessage[] = [{ role: 'system', content: buildSessionPrompt() }];
+  const permissionSession: SessionPermissionMemory = {};
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const pendingInput = createPendingInputController();
@@ -202,7 +204,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
     foregroundBusy = true;
     try {
       if (session.mode === 'agent') {
-        await streamAgentResponse(messages, currentModel, session);
+        await streamAgentResponse(messages, currentModel, session, askPrompt, permissionSession);
       } else {
         await streamAIResponse(messages, currentModel, (cancel) => {
           activeCancel = cancel;
@@ -714,32 +716,27 @@ async function streamAIResponse(
 async function streamAgentResponse(
   messages: ChatMessage[],
   model: ModelInfo,
-  session: AiSessionState
+  session: AiSessionState,
+  askLine: (prompt: string) => Promise<string>,
+  permissionSession: SessionPermissionMemory
 ): Promise<void> {
   const spinner = new Spinner('Agent 思考中');
   spinner.start();
   const userMessage = messages[messages.length - 1];
 
   try {
-    const result = await runAgentTurn({
+    let result = await runAgentTurn({
       messages,
       workspaceRoot: process.cwd(),
       mode: session.mode,
       permissionMode: session.permissionMode,
+      session: permissionSession,
       complete: (nextMessages) => chatCompleteMessage(nextMessages, model, buildProviderToolSpecs()),
     });
 
     spinner.stop();
-    result.toolResults.forEach((toolResult) => {
-      console.log(renderTimelineEntry({
-        kind: 'tool',
-        status: toolResult.message.content.startsWith('Error:') ? 'failed' : 'completed',
-        label: toolResult.toolCall.function.name,
-        detail: toolResult.message.content,
-      }));
-    });
 
-    if (result.status === 'permission_required') {
+    while (result.status === 'permission_required') {
       if (messages[messages.length - 1] === result.assistantMessage) {
         messages.pop();
       }
@@ -748,9 +745,47 @@ async function streamAgentResponse(
         action: 'ask',
         reason: result.permission.reason,
       }));
-      printWarning('Agent 需要确认后才能继续执行该工具。');
-      return;
+      console.log(chalk.gray(formatPermissionPromptOptions()));
+
+      let choice = parsePermissionPromptChoice('');
+      while (choice.kind === 'invalid') {
+        const answer = await askLine(chalk.cyan('  Choose 1/2/3: '));
+        choice = parsePermissionPromptChoice(answer);
+        if (choice.kind === 'invalid') printWarning('请输入 1、2 或 3。');
+      }
+
+      const next = await applyPermissionPromptChoice({
+        choice,
+        pending: result,
+        messages,
+        workspaceRoot: process.cwd(),
+        mode: session.mode,
+        permissionMode: session.permissionMode,
+        session: permissionSession,
+        complete: (nextMessages) => chatCompleteMessage(nextMessages, model, buildProviderToolSpecs()),
+      });
+
+      if (next.status === 'denied') {
+        console.log(renderTimelineEntry({
+          kind: 'tool',
+          status: 'failed',
+          label: result.pendingToolCall.function.name,
+          detail: next.toolMessage.content,
+        }));
+        printWarning('Tool denied by user.');
+        return;
+      }
+      result = next;
     }
+
+    result.toolResults.forEach((toolResult) => {
+      console.log(renderTimelineEntry({
+        kind: 'tool',
+        status: toolResult.message.content.startsWith('Error:') ? 'failed' : 'completed',
+        label: toolResult.toolCall.function.name,
+        detail: toolResult.message.content,
+      }));
+    });
 
     if (result.finalMessage.content) {
       const renderer = new StreamRenderer();

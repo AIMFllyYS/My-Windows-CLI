@@ -12,6 +12,7 @@ export interface ExecuteToolCallInput {
   permissionMode: PermissionMode;
   workspaceRoot: string;
   session?: SessionPermissionMemory;
+  forcePermissionDecision?: PermissionDecision;
 }
 
 export interface ExecuteToolCallResult {
@@ -95,6 +96,11 @@ export async function executeToolCall(input: ExecuteToolCallInput): Promise<Exec
       workspaceRoot: input.workspaceRoot,
       session: input.session,
     });
+    if (input.forcePermissionDecision?.decision === 'allow' && permission.decision === 'ask') {
+      permission = input.forcePermissionDecision;
+    } else if (input.forcePermissionDecision?.decision === 'deny') {
+      permission = input.forcePermissionDecision;
+    }
   } catch {
     permission = { decision: 'deny', reason: 'unknown tool' };
   }
