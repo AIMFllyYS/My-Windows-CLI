@@ -10,8 +10,10 @@ export interface ModelInfo {
 
 export interface ProviderConfig {
   name: string;
-  baseUrl: string;
-  apiKey: string;
+  hostname: string;
+  path: string;
+  key: string;
+  modelId: string;
 }
 
 // === Chat Types ===

@@ -17,20 +17,51 @@ interface StreamCallbacks {
 }
 
 interface ProviderSpec {
+  name: string;
   hostname: string;
   path: string;
   key: string;
+  modelId: string;
 }
 
-function getProvider(model: ModelInfo): ProviderSpec {
-  // Read keys at call time (after dotenv has loaded)
+export function getProviderConfig(model: Pick<ModelInfo, 'id' | 'provider'>): ProviderSpec {
+  const customBaseUrl = process.env.AI_BASE_URL || '';
+  const customKey = process.env.AI_API_KEY || '';
+  const customModel = process.env.AI_MODEL || '';
   const deepseekKey = process.env.DEEPSEEK_API_KEY || '';
   const zhipuKey = process.env.ZHIPU_API_KEY || '';
 
-  if (model.provider === 'zhipu') {
-    return { hostname: 'open.bigmodel.cn', path: '/api/paas/v4/chat/completions', key: zhipuKey };
+  if (customBaseUrl || customKey || customModel) {
+    const parsed = new URL(customBaseUrl || 'https://api.openai.com/v1');
+    let apiPath = parsed.pathname.replace(/\/$/, '');
+    if (!apiPath.endsWith('/chat/completions')) {
+      apiPath += '/chat/completions';
+    }
+    return {
+      name: 'custom',
+      hostname: parsed.hostname,
+      path: apiPath,
+      key: customKey,
+      modelId: customModel || model.id,
+    };
   }
-  return { hostname: 'api.deepseek.com', path: '/chat/completions', key: deepseekKey };
+
+  if (model.provider === 'zhipu') {
+    return {
+      name: 'zhipu',
+      hostname: 'open.bigmodel.cn',
+      path: '/api/paas/v4/chat/completions',
+      key: zhipuKey,
+      modelId: model.id,
+    };
+  }
+  return {
+    name: 'deepseek',
+    hostname: 'api.deepseek.com',
+    path: '/chat/completions',
+    key: deepseekKey,
+    modelId: model.id,
+  };
 }
 
 /**
@@ -42,16 +73,16 @@ export function streamChat(
   callbacks: StreamCallbacks,
   tools?: any[]
 ): void {
-  const provider = getProvider(model);
+  const provider = getProviderConfig(model);
 
   if (!provider.key) {
-    const name = model.provider === 'zhipu' ? 'ZHIPU_API_KEY' : 'DEEPSEEK_API_KEY';
+    const name = provider.name === 'custom' ? 'AI_API_KEY' : model.provider === 'zhipu' ? 'ZHIPU_API_KEY' : 'DEEPSEEK_API_KEY';
     callbacks.onError(new Error(`${name} 未配置，请检查 .env 文件`));
     return;
   }
 
   const body: any = {
-    model: model.id,
+    model: provider.modelId,
     messages,
     stream: true,
     max_tokens: 4096,
@@ -164,15 +195,15 @@ export function streamChat(
  */
 export function chatComplete(messages: ChatMessage[], model: ModelInfo, tools?: any[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    const provider = getProvider(model);
+    const provider = getProviderConfig(model);
 
     if (!provider.key) {
-      const name = model.provider === 'zhipu' ? 'ZHIPU_API_KEY' : 'DEEPSEEK_API_KEY';
+      const name = provider.name === 'custom' ? 'AI_API_KEY' : model.provider === 'zhipu' ? 'ZHIPU_API_KEY' : 'DEEPSEEK_API_KEY';
       reject(new Error(`${name} 未配置，请检查 .env 文件`));
       return;
     }
 
-    const body: any = { model: model.id, messages, stream: false, max_tokens: 4096 };
+    const body: any = { model: provider.modelId, messages, stream: false, max_tokens: 4096 };
     if (tools && tools.length > 0 && model.provider === 'zhipu') {
       body.tools = tools;
     }
