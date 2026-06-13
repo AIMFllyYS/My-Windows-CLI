@@ -8,7 +8,7 @@ import { executeTool, getSystemPrompt, isToolCommand } from './tools';
 import { Spinner, printSuccess, printError, printInfo, printWarning, printDivider, StreamRenderer } from './renderer';
 import { interactiveSelect } from '../utils/selector';
 import { parseAiEnv, resolveEnvPath, writeAiSettings } from './config';
-import { parseSlashCommand, resolveModelCommand } from './commands';
+import { formatSlashMenu, parseSlashCommand, resolveModelCommand } from './commands';
 import { createInterruptController, createPendingInputController } from './interrupts';
 import { resolveModeCommand } from './modes';
 import { AiSessionState, createSessionState, setCurrentModel, setMode } from './session';
@@ -220,6 +220,10 @@ async function handleCommand(
   if (!parsed) return 'continue';
   const cmd = parsed.command;
   const args = parsed.args;
+  if (cmd === '/') {
+    printSlashMenu(session.mode);
+    return 'continue';
+  }
   if (cmd === '/agent' && args.trim()) {
     await handleAgentCommand(args, currentModel, session, hooks);
     return 'continue';
@@ -242,6 +246,7 @@ async function handleCommand(
     case '/help':
     case '/h':
       printHelp();
+      printSlashMenu(session.mode);
       return 'continue';
 
     case '/model':
@@ -314,6 +319,16 @@ function printRuntimeSkills(skills: RuntimeSkill[], activeSkillIds: string[]): v
   console.log(chalk.bold.cyan('  Skills'));
   printDivider();
   console.log(formatSkillList(skills, activeSkillIds));
+  console.log('');
+}
+
+function printSlashMenu(mode: AiSessionState['mode']): void {
+  console.log('');
+  console.log(chalk.bold.cyan('  Slash commands'));
+  printDivider();
+  formatSlashMenu(mode).split('\n').forEach((line) => {
+    console.log(chalk.white('  ' + line));
+  });
   console.log('');
 }
 

@@ -73,13 +73,15 @@ input {
 }
 
 .sessionList,
-.stack {
+.stack,
+.commandGrid {
   display: grid;
   gap: 10px;
 }
 
 .session,
 .stack button,
+.commandCard,
 .tabs button,
 .modeSwitch button,
 .composer button {
@@ -179,6 +181,35 @@ input {
 .composer button,
 .stack button {
   padding: 11px 14px;
+}
+
+.commandGrid {
+  grid-template-columns: 1fr;
+}
+
+.commandCard {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  text-align: left;
+}
+
+.commandCard strong {
+  color: #f4f0e8;
+}
+
+.commandCard code {
+  color: #9be7c7;
+}
+
+.commandCard span,
+.stack p {
+  color: #b8b0a3;
+  line-height: 1.45;
+}
+
+.stack a {
+  color: #9be7c7;
 }
 
 .inspector {

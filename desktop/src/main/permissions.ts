@@ -3,6 +3,9 @@ const ALLOWED_COMMANDS = new Set([
   'api',
   'pay',
   'help',
+  'clear',
+  'skills',
+  'install',
 ]);
 
 export function isAllowedDesktopCommand(command: string): boolean {
@@ -10,5 +13,5 @@ export function isAllowedDesktopCommand(command: string): boolean {
 }
 
 export function normalizeDesktopCommand(command: string): string {
-  return command.trim().replace(/^--/, '').toLowerCase();
+  return command.trim().replace(/^hi\s+/, '').replace(/^--/, '').toLowerCase();
 }

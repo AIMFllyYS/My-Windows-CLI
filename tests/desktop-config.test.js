@@ -50,6 +50,8 @@ test('desktop release workflow uploads windows and mac artifacts', () => {
   assert.match(workflow, /npm install/);
   assert.doesNotMatch(workflow, /cache:\s*npm/);
   assert.match(workflow, /upload-artifact/);
+  assert.match(workflow, /softprops\/action-gh-release/);
+  assert.match(workflow, /contents: write/);
   assert.match(workflow, /desktop:dist:win/);
   assert.match(workflow, /desktop:dist:mac/);
 });
@@ -68,9 +70,21 @@ test('desktop runner supports packaged CLI resource path', () => {
 test('desktop IPC bridge restricts renderer origin and noninteractive commands', () => {
   const main = fs.readFileSync(path.join('desktop', 'src', 'main', 'main.ts'), 'utf8');
   const permissions = fs.readFileSync(path.join('desktop', 'src', 'main', 'permissions.ts'), 'utf8');
+  const renderer = fs.readFileSync(path.join('desktop', 'src', 'renderer', 'App.tsx'), 'utf8');
 
   assert.match(main, /isAllowedRendererUrl/);
   assert.match(main, /senderFrame\?\.url/);
-  assert.doesNotMatch(permissions, /'install'/);
-  assert.doesNotMatch(permissions, /'skills'/);
+  assert.match(permissions, /'install'/);
+  assert.match(permissions, /'skills'/);
+  assert.match(permissions, /'clear'/);
+  assert.match(renderer, /hi --clear/);
+  assert.match(renderer, /hi --skills/);
+  assert.match(renderer, /hi --install/);
+});
+
+test('desktop builder is wired for GitHub release publishing', () => {
+  const builder = fs.readFileSync(path.join('desktop', 'electron-builder.yml'), 'utf8');
+
+  assert.match(builder, /provider: github/);
+  assert.match(builder, /releaseType: release/);
 });

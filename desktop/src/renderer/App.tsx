@@ -4,6 +4,12 @@ import './styles.css';
 
 type Mode = 'chat' | 'agent' | 'plan';
 type Tab = 'plan' | 'tools' | 'diff' | 'preview' | 'settings';
+type CommandCard = {
+  id: string;
+  title: string;
+  command: string;
+  description: string;
+};
 
 declare global {
   interface Window {
@@ -22,6 +28,15 @@ const sessions = [
 const transcript = [
   { role: 'system', text: '0-1 CLI Desktop mirrors the AI runtime: chat, agent, plan, settings, models, skills, and local subagents.' },
   { role: 'assistant', text: 'Choose a mode, review tools, then run focused CLI actions from the right pane.' },
+];
+
+const commandCards: CommandCard[] = [
+  { id: 'clear', title: 'Clean workstation', command: 'hi --clear', description: 'Run the cleanup entrypoint with the same guardrails as the CLI.' },
+  { id: 'skills', title: 'Skills market', command: 'hi --skills', description: 'Open the skill installer and review available local skills.' },
+  { id: 'install', title: 'Install tools', command: 'hi --install', description: 'Open the installer flow for AI CLIs, IDE helpers, and environment tools.' },
+  { id: 'state', title: 'System state', command: 'hi --state', description: 'Show GitHub, project paths, commands, and app status.' },
+  { id: 'api', title: 'API platforms', command: 'hi --api', description: 'Open model API platform guidance.' },
+  { id: 'pay', title: 'Payment resources', command: 'hi --pay', description: 'Open payment and account resource guidance.' },
 ];
 
 function App(): React.ReactElement {
@@ -104,16 +119,25 @@ function App(): React.ReactElement {
 
         <section className="panel">
           {tab === 'tools' && (
-            <div className="stack">
-              <button onClick={() => runCommand('api')}>API platforms</button>
-              <button onClick={() => runCommand('pay')}>Payment links</button>
-              <button onClick={() => runCommand('state')}>State</button>
+            <div className="commandGrid">
+              {commandCards.map((card) => (
+                <button className="commandCard" key={card.id} onClick={() => runCommand(card.command)}>
+                  <strong>{card.title}</strong>
+                  <code>{card.command}</code>
+                  <span>{card.description}</span>
+                </button>
+              ))}
             </div>
           )}
           {tab === 'plan' && <p>Plan mode is read-only. Use the CLI conversation to draft and review task plans.</p>}
           {tab === 'diff' && <p>Diff review is prepared for file-change summaries from future agent runs.</p>}
           {tab === 'preview' && <p>Preview panes can host local app/browser output in a later integration.</p>}
-          {tab === 'settings' && <p>Use /setting in AI mode to configure URL, API key, and model IDs.</p>}
+          {tab === 'settings' && (
+            <div className="stack">
+              <p>Use /setting in AI mode to configure URL, API key, and model IDs.</p>
+              <a href="https://github.com/" target="_blank" rel="noreferrer">Open GitHub Releases</a>
+            </div>
+          )}
         </section>
 
         <pre className="output">{output}</pre>

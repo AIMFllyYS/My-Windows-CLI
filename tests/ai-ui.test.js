@@ -115,3 +115,16 @@ test('permission box formatter is wired into chat runtime', () => {
   assert.match(source, /formatPermissionDecision/);
   assert.match(source, /subagent runs in/);
 });
+
+test('slash menu exposes mode and runtime commands', () => {
+  const { formatSlashMenu, getSlashMenuItems } = require('../dist/chat/commands');
+
+  const chatMenu = formatSlashMenu('chat');
+  const agentItems = getSlashMenuItems('agent').map((item) => item.command);
+
+  assert.match(chatMenu, /\/chat/);
+  assert.match(chatMenu, /\/setting/);
+  assert.doesNotMatch(chatMenu, /\/agent spawn <task>/);
+  assert.ok(agentItems.includes('/agent spawn <task>'));
+  assert.ok(agentItems.includes('/skills'));
+});
