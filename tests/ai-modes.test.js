@@ -65,3 +65,48 @@ test('resolveModeCommand supports slash mode commands', () => {
   assert.deepEqual(resolveModeCommand('/plan'), { mode: 'plan' });
   assert.equal(resolveModeCommand('/model'), null);
 });
+
+test('mode metadata and cycle mirror Claude-style footer modes', () => {
+  const { getModeConfig, getNextMode } = require('../dist/chat/modes');
+  const { createSessionState } = require('../dist/chat/session');
+  const normal = createSessionState({ modelId: 'model-a', autoAccept: false });
+  const auto = createSessionState({ modelId: 'model-a', autoAccept: true });
+
+  assert.deepEqual(getModeConfig('chat'), {
+    title: 'Chat Mode',
+    shortTitle: 'Chat',
+    symbol: 'C',
+    color: 'text',
+    hint: 'read-only',
+  });
+  assert.deepEqual(getModeConfig('agent'), {
+    title: 'Agent Mode',
+    shortTitle: 'Agent',
+    symbol: 'A',
+    color: 'permission',
+    hint: 'asks before tools',
+  });
+  assert.deepEqual(getModeConfig('plan'), {
+    title: 'Plan Mode',
+    shortTitle: 'Plan',
+    symbol: 'P',
+    color: 'plan',
+    hint: 'no edits',
+  });
+
+  assert.equal(getNextMode(normal), 'agent');
+  normal.mode = 'agent';
+  normal.permissionMode = 'ask';
+  assert.equal(getNextMode(normal), 'plan');
+  normal.mode = 'plan';
+  normal.permissionMode = 'plan';
+  assert.equal(getNextMode(normal), 'chat');
+
+  assert.equal(getNextMode(auto), 'chat');
+  auto.mode = 'chat';
+  auto.permissionMode = 'ask';
+  assert.equal(getNextMode(auto), 'plan');
+  auto.mode = 'plan';
+  auto.permissionMode = 'plan';
+  assert.equal(getNextMode(auto), 'agent');
+});

@@ -27,8 +27,8 @@ test('status header includes project mode model permission and UTF-8 labels', ()
 
   assert.match(output, /0-1 CLI/);
   assert.match(output, /My-CLI/);
-  assert.match(output, /agent/);
-  assert.match(output, /ask/);
+  assert.match(output, /\[A Agent\]/);
+  assert.match(output, /asks before tools/);
   assert.match(output, /glm-4\.5/);
   assert.match(output, /技能 2/);
   assert.match(output, /子任务 1/);
@@ -116,6 +116,17 @@ test('permission box formatter is wired into chat runtime', () => {
   assert.match(source, /subagent runs in/);
 });
 
+test('mode pill renders all modes without exceeding status width', () => {
+  const { renderModePill } = require('../dist/chat/ui/layout');
+
+  for (const mode of ['chat', 'agent', 'plan']) {
+    const output = renderModePill(mode, mode === 'agent' ? 'ask' : mode === 'plan' ? 'plan' : 'ask');
+    const plain = stripAnsi(output);
+    assert.match(plain, /^\[[CAP] /);
+    assert.ok(visibleLength(output) <= 28, `mode pill too wide: ${plain}`);
+  }
+});
+
 test('slash menu exposes mode and runtime commands', () => {
   const { formatSlashMenu, getSlashMenuItems } = require('../dist/chat/commands');
 
@@ -146,4 +157,13 @@ test('chat runtime wires permission dialog choices into agent ask mode', () => {
   assert.match(source, /applyPermissionPromptChoice/);
   assert.match(source, /permissionSession/);
   assert.match(source, /askLine/);
+});
+
+test('chat runtime wires mode-cycle shortcuts into the keypress handler', () => {
+  const source = fs.readFileSync('src/chat/index.ts', 'utf8');
+
+  assert.match(source, /getNextMode/);
+  assert.match(source, /cycleMode/);
+  assert.match(source, /shift/);
+  assert.match(source, /meta/);
 });

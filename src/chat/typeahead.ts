@@ -185,6 +185,14 @@ export function promptWithSlashTypeahead(options: SlashPromptOptions): Promise<s
         render();
         return;
       }
+      if (key?.name === 'tab' && key.shift) {
+        if (state.active) {
+          state = dismissSlashTypeahead(state);
+          options.onOverlayChange?.(false);
+          render();
+        }
+        return;
+      }
       if (key?.name === 'tab' && state.active) {
         const applied = applySlashSelection(state, 'tab');
         if (applied.action === 'complete') value = applied.input;

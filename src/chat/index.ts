@@ -10,7 +10,7 @@ import { interactiveSelect } from '../utils/selector';
 import { parseAiEnv, resolveEnvPath, writeAiSettings } from './config';
 import { formatSlashMenu, parseSlashCommand, resolveModelCommand } from './commands';
 import { createInterruptController, createPendingInputController } from './interrupts';
-import { resolveModeCommand } from './modes';
+import { getNextMode, resolveModeCommand } from './modes';
 import { AiSessionState, createSessionState, setCurrentModel, setMode } from './session';
 import { ActiveRuntimeSkill, discoverRuntimeSkills, formatSkillContextMessage, formatSkillList, loadRuntimeSkillContent, resolveSkillSelection, RuntimeSkill, trimMessagesPreservingSkillContext, upsertSkillContextMessage } from './skills';
 import { createSubagentQueue, enqueueSubagent, cancelSubagent, formatSubagentList, resolveAgentCommand, runNextSubagent, setSubagentParentPermission } from './agent/subagents';
@@ -78,6 +78,13 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
   let subagentCancel: (() => void) | null = null;
   let subagentWorkerActive = false;
   const hasActiveWork = (): boolean => foregroundBusy || Boolean(subagentCancel);
+  const cycleMode = () => {
+    setMode(session, getNextMode(session));
+    setSubagentParentPermission(session.subagents!, session.permissionMode);
+    messages[0] = { role: 'system', content: buildSessionPrompt() };
+    syncSkillContext();
+    printSuccess(`已切换到 ${session.mode} 模式`);
+  };
   const handleInterrupt = (source: 'Ctrl+C' | 'Esc') => {
     const result = interruptController.handle({ running: hasActiveWork(), inSubmenu: session.inSubmenu });
     if (result.action === 'back') {
@@ -110,6 +117,10 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
     handleInterrupt('Ctrl+C');
   };
   const onKeypress = (_str: string | undefined, key: readline.Key) => {
+    if ((key?.name === 'tab' && key.shift) || (key?.name === 'm' && key.meta)) {
+      cycleMode();
+      return;
+    }
     if (key?.ctrl && key.name === 'c') handleInterrupt('Ctrl+C');
     if (key?.name === 'escape') handleInterrupt('Esc');
   };

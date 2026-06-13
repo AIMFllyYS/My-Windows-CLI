@@ -1,4 +1,5 @@
 import { AiMode, PermissionMode } from '../session';
+import { getModeConfig } from '../modes';
 import { line, truncateVisible, ui, UI_WIDTH, visibleLength } from './theme';
 
 export interface StatusHeaderInput {
@@ -23,11 +24,25 @@ export interface TimelineEntryInput {
   detail?: string;
 }
 
+export function renderModePill(mode: AiMode, permissionMode: PermissionMode): string {
+  const config = getModeConfig(mode);
+  const label = `[${config.symbol} ${config.shortTitle}]`;
+  const suffix = permissionMode === 'bypass'
+    ? ' bypass'
+    : permissionMode === 'plan'
+      ? ' no edits'
+      : ` ${config.hint}`;
+  const text = `${label}${suffix}`;
+  if (config.color === 'plan') return ui.accent(text);
+  if (config.color === 'permission') return ui.warning(text);
+  if (config.color === 'danger') return ui.danger(text);
+  return ui.strong(text);
+}
+
 export function renderStatusHeader(input: StatusHeaderInput): string {
   const title = `${ui.brand('0-1 CLI')} ${ui.muted('·')} ${ui.strong(truncateVisible(input.project, 28))}`;
   const meta = [
-    `mode ${input.mode}`,
-    `permission ${input.permissionMode}`,
+    renderModePill(input.mode, input.permissionMode),
     `model ${truncateVisible(input.model, 10)}`,
     `技能 ${input.activeSkills || 0}`,
     `子任务 ${input.runningSubagents || 0}`,
