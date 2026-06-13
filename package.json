@@ -18,6 +18,10 @@
     "test:ai-config": "node --test tests/ai-config.test.js",
     "test:onboarding": "node --test tests/onboarding.test.js",
     "test:resources": "node --test tests/resources.test.js",
+    "desktop:install": "npm install --prefix desktop",
+    "desktop:build": "npm run build && npm run build --prefix desktop",
+    "desktop:dist:win": "npm run desktop:build && npm run dist:win --prefix desktop",
+    "desktop:dist:mac": "npm run desktop:build && npm run dist:mac --prefix desktop",
     "link": "npm link",
     "pkg": "pkg dist/index.js --targets node18-win-x64 --output dist/hi.exe"
   },

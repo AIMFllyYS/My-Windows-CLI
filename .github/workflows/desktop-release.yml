@@ -1,0 +1,37 @@
+name: Desktop Release
+
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run desktop:install
+      - run: npm run desktop:dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: desktop/release/**
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run desktop:install
+      - run: npm run desktop:dist:mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: desktop/release/**
