@@ -221,12 +221,14 @@ input {
 }
 
 .installPanel,
-.skillsPanel {
+.skillsPanel,
+.clearPanel {
   display: grid;
   gap: 14px;
 }
 
 .panelHeader,
+.headerActions,
 .confirmStrip {
   display: flex;
   align-items: center;
@@ -253,7 +255,8 @@ input {
 .panelHeader button,
 .confirmStrip button,
 .categorySwitch button,
-.installTarget {
+.installTarget,
+.clearProcess {
   border: 1px solid rgba(244, 240, 232, 0.14);
   border-radius: 6px;
   background: #17191c;
@@ -281,11 +284,39 @@ input {
 }
 
 .installTarget,
-.skillPackage {
+.skillPackage,
+.clearProcess {
   display: grid;
   gap: 6px;
   padding: 11px;
   text-align: left;
+}
+
+.clearProcesses {
+  display: grid;
+  gap: 9px;
+  max-height: 340px;
+  overflow: auto;
+}
+
+.clearProcess {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+}
+
+.clearProcess span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.clearProcess em,
+.clearProcess small,
+.emptyState {
+  color: #b8b0a3;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.45;
 }
 
 .skillPackages {

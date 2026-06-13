@@ -33,6 +33,7 @@ test('desktop main preload and renderer entry files exist', () => {
   [
     'desktop/index.html',
     'desktop/src/main/main.ts',
+    'desktop/src/main/clear-actions.ts',
     'desktop/src/main/cli-runner.ts',
     'desktop/src/main/github-release.ts',
     'desktop/src/main/skills-actions.ts',

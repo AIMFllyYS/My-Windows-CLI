@@ -27,6 +27,15 @@ type SkillTarget = {
   path: string;
   detected: boolean;
 };
+type ClearProcess = {
+  pid: number;
+  name: string;
+  memoryMB: number;
+  cpuSeconds: number;
+  path?: string;
+  windowTitle?: string;
+  reason: string;
+};
 
 declare global {
   interface Window {
@@ -38,6 +47,8 @@ declare global {
       runInstallTarget: (request: { key: string; latest?: boolean; confirm?: boolean }) => Promise<{ ok: boolean; output: string; requiresConfirmation?: boolean }>;
       listSkillPackages: () => Promise<{ packages: SkillPackage[]; targets: SkillTarget[] }>;
       installSkillPackage: (request: { skillKey: string; targetKeys: string[]; confirm?: boolean }) => Promise<{ ok: boolean; output: string; requiresConfirmation?: boolean }>;
+      scanClearProcesses: () => Promise<{ ok: boolean; processes: ClearProcess[]; total: number; filtered: number; output: string }>;
+      killClearProcesses: (request: { pids: number[]; confirm?: boolean }) => Promise<{ ok: boolean; output: string; requiresConfirmation?: boolean }>;
     };
   }
 }
@@ -65,6 +76,8 @@ function App(): React.ReactElement {
   const [skillTargets, setSkillTargets] = useState<SkillTarget[]>([]);
   const [selectedSkillKey, setSelectedSkillKey] = useState<string | null>(null);
   const [selectedSkillTargets, setSelectedSkillTargets] = useState<string[]>([]);
+  const [clearProcesses, setClearProcesses] = useState<ClearProcess[]>([]);
+  const [selectedClearPids, setSelectedClearPids] = useState<number[]>([]);
   const [output, setOutput] = useState('Ready.');
   const [releaseStatus, setReleaseStatus] = useState('Release status not checked.');
   const modeLabel = useMemo(() => `${mode} / ${mode === 'plan' ? 'plan' : 'ask'}`, [mode]);
@@ -88,6 +101,13 @@ function App(): React.ReactElement {
       setOutput('Desktop bridge is unavailable in browser preview.');
       return;
     }
+    if (action.kind === 'native-clear') {
+      const scan = await window.zeroOneCli.scanClearProcesses();
+      setClearProcesses(scan.processes);
+      setSelectedClearPids([]);
+      setOutput(scan.output || (scan.ok ? 'Process scan completed.' : 'Process scan failed.'));
+      return;
+    }
     if (action.kind === 'native-skills') {
       const catalog = await window.zeroOneCli.listSkillPackages();
       setSkillPackages(catalog.packages);
@@ -101,6 +121,34 @@ function App(): React.ReactElement {
     setInstallTargets(targets);
     setSelectedInstallKey(targets.find((item) => item.category === installCategory)?.key || null);
     setOutput('Choose an install target, then confirm from the desktop panel.');
+  }
+
+  async function refreshClearProcesses(): Promise<void> {
+    if (!window.zeroOneCli) {
+      setOutput('Desktop bridge is unavailable in browser preview.');
+      return;
+    }
+    const scan = await window.zeroOneCli.scanClearProcesses();
+    setClearProcesses(scan.processes);
+    setSelectedClearPids((current) => current.filter((pid) => scan.processes.some((item) => item.pid === pid)));
+    setOutput(scan.output || (scan.ok ? 'Process scan completed.' : 'Process scan failed.'));
+  }
+
+  async function runSelectedClearKill(): Promise<void> {
+    if (!window.zeroOneCli) {
+      setOutput('Desktop bridge is unavailable in browser preview.');
+      return;
+    }
+    if (selectedClearPids.length === 0) {
+      setOutput('Select at least one process first.');
+      return;
+    }
+    const result = await window.zeroOneCli.killClearProcesses({
+      pids: selectedClearPids,
+      confirm: true,
+    });
+    setOutput(result.output || (result.ok ? 'Selected processes ended.' : 'Clear action failed.'));
+    await refreshClearProcesses();
   }
 
   async function runSelectedInstall(): Promise<void> {
@@ -216,7 +264,7 @@ function App(): React.ReactElement {
         </nav>
 
         <section className="panel">
-          {tab === 'tools' && activeAction !== 'install' && activeAction !== 'skills' && (
+          {tab === 'tools' && activeAction !== 'install' && activeAction !== 'skills' && activeAction !== 'clear' && (
             <div className="commandGrid">
               {desktopActions.map((card) => (
                 <button className="commandCard" key={card.id} onClick={() => void openAction(card)}>
@@ -259,6 +307,20 @@ function App(): React.ReactElement {
               onInstall={runSelectedSkillInstall}
             />
           )}
+          {tab === 'tools' && activeAction === 'clear' && (
+            <ClearPanel
+              processes={clearProcesses}
+              selectedPids={selectedClearPids}
+              onBack={() => setActiveAction(null)}
+              onRefresh={refreshClearProcesses}
+              onToggle={(pid) => {
+                setSelectedClearPids((current) => current.includes(pid)
+                  ? current.filter((item) => item !== pid)
+                  : [...current, pid]);
+              }}
+              onKill={runSelectedClearKill}
+            />
+          )}
           {tab === 'plan' && <p>Plan mode is read-only. Use the CLI conversation to draft and review task plans.</p>}
           {tab === 'diff' && <p>Diff review is prepared for file-change summaries from future agent runs.</p>}
           {tab === 'preview' && <p>Preview panes can host local app/browser output in a later integration.</p>}
@@ -275,6 +337,51 @@ function App(): React.ReactElement {
         <pre className="output">{output}</pre>
       </aside>
     </main>
+  );
+}
+
+function ClearPanel(props: {
+  processes: ClearProcess[];
+  selectedPids: number[];
+  onBack: () => void;
+  onRefresh: () => void;
+  onToggle: (pid: number) => void;
+  onKill: () => void;
+}): React.ReactElement {
+  return (
+    <div className="clearPanel">
+      <div className="panelHeader">
+        <div>
+          <p>native desktop action</p>
+          <h2>Clean workstation</h2>
+        </div>
+        <div className="headerActions">
+          <button onClick={() => void props.onRefresh()}>Scan</button>
+          <button onClick={props.onBack}>Back</button>
+        </div>
+      </div>
+      <div className="clearProcesses">
+        {props.processes.length === 0 && (
+          <p className="emptyState">No safe background process candidates found.</p>
+        )}
+        {props.processes.map((item) => (
+          <label key={item.pid} className={props.selectedPids.includes(item.pid) ? 'clearProcess selectedTarget' : 'clearProcess'}>
+            <input type="checkbox" checked={props.selectedPids.includes(item.pid)} onChange={() => props.onToggle(item.pid)} />
+            <span>
+              <strong>{item.name}</strong>
+              <em>PID {item.pid} / {item.memoryMB.toFixed(1)} MB / CPU {item.cpuSeconds.toFixed(1)}s</em>
+              <small>{item.reason}</small>
+            </span>
+          </label>
+        ))}
+      </div>
+      <div className="confirmStrip">
+        <span>{props.selectedPids.length} processes selected. Confirmation is required before taskkill runs.</span>
+        <button disabled={props.selectedPids.length === 0} onClick={() => void props.onKill()}>
+          Confirm end selected
+        </button>
+      </div>
+    </div>
   );
 }
 

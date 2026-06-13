@@ -15,6 +15,7 @@ test('desktop action catalog exposes native install skills clear and utility act
   assert.match(catalog, /id: 'skills'/);
   assert.match(catalog, /kind: 'native-skills'/);
   assert.match(catalog, /id: 'clear'/);
+  assert.match(catalog, /kind: 'native-clear'/);
   assert.match(catalog, /id: 'state'/);
   assert.match(catalog, /id: 'api'/);
   assert.match(catalog, /id: 'pay'/);
@@ -54,6 +55,22 @@ test('desktop skills IPC lists marketplace and requires explicit target confirma
   assert.doesNotMatch(skillsActions, /readline|question\(/);
 });
 
+test('desktop clear IPC scans first and requires explicit confirmation before killing processes', () => {
+  const main = read('desktop/src/main/main.ts');
+  const clearActions = read('desktop/src/main/clear-actions.ts');
+  const preload = read('desktop/src/preload/index.ts');
+
+  assert.match(main, /desktop-clear:scan/);
+  assert.match(main, /desktop-clear:kill/);
+  assert.match(preload, /scanClearProcesses/);
+  assert.match(preload, /killClearProcesses/);
+  assert.match(clearActions, /scanDesktopClearProcesses/);
+  assert.match(clearActions, /killDesktopClearProcesses/);
+  assert.match(clearActions, /confirm !== true/);
+  assert.match(clearActions, /taskkill/);
+  assert.doesNotMatch(clearActions, /readline|question\(|Remove-Item|Clear-RecycleBin/);
+});
+
 test('desktop renderer opens native install panel instead of running interactive install command', () => {
   const renderer = read('desktop/src/renderer/App.tsx');
 
@@ -72,4 +89,14 @@ test('desktop renderer opens native skills panel instead of running interactive 
   assert.match(renderer, /installSkillPackage/);
   assert.match(renderer, /SkillsPanel/);
   assert.doesNotMatch(renderer, /runCommand\('hi --skills'\)/);
+});
+
+test('desktop renderer opens native clear panel instead of running interactive clear command', () => {
+  const renderer = read('desktop/src/renderer/App.tsx');
+
+  assert.match(renderer, /activeAction === 'clear'/);
+  assert.match(renderer, /scanClearProcesses/);
+  assert.match(renderer, /killClearProcesses/);
+  assert.match(renderer, /ClearPanel/);
+  assert.doesNotMatch(renderer, /runCommand\('hi --clear'\)/);
 });

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
+import { killDesktopClearProcesses, scanDesktopClearProcesses } from './clear-actions';
 import { runDesktopCli } from './cli-runner';
 import { getLatestRelease, getReleasePageUrl } from './github-release';
 import { listDesktopInstallTargets, runDesktopInstallTarget } from './install-actions';
@@ -90,6 +91,20 @@ app.whenReady().then(() => {
       return { ok: false, output: 'IPC sender is not trusted.' };
     }
     return installDesktopSkillPackage(request);
+  });
+  ipcMain.handle('desktop-clear:scan', (event) => {
+    const senderUrl = event.senderFrame?.url || '';
+    if (!isTrustedSender(senderUrl)) {
+      return { ok: false, processes: [], total: 0, filtered: 0, output: 'IPC sender is not trusted.' };
+    }
+    return scanDesktopClearProcesses();
+  });
+  ipcMain.handle('desktop-clear:kill', (event, request) => {
+    const senderUrl = event.senderFrame?.url || '';
+    if (!isTrustedSender(senderUrl)) {
+      return { ok: false, output: 'IPC sender is not trusted.' };
+    }
+    return killDesktopClearProcesses(request);
   });
   createWindow();
 

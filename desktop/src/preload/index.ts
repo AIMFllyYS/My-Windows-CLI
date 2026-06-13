@@ -8,4 +8,6 @@ contextBridge.exposeInMainWorld('zeroOneCli', {
   runInstallTarget: (request: { key: string; latest?: boolean; confirm?: boolean }) => ipcRenderer.invoke('desktop-install:run', request),
   listSkillPackages: () => ipcRenderer.invoke('desktop-skills:list'),
   installSkillPackage: (request: { skillKey: string; targetKeys: string[]; confirm?: boolean }) => ipcRenderer.invoke('desktop-skills:install', request),
+  scanClearProcesses: () => ipcRenderer.invoke('desktop-clear:scan'),
+  killClearProcesses: (request: { pids: number[]; confirm?: boolean }) => ipcRenderer.invoke('desktop-clear:kill', request),
 });
