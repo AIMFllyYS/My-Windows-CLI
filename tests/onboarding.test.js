@@ -17,6 +17,16 @@ test('default guide explains CLI onboarding in plain Chinese', () => {
   assert.ok(keys.includes('community'));
 });
 
+test('hi startup prints logo and zero-one welcome copy once before guide', () => {
+  const output = execFileSync('node', ['dist/index.js'], { encoding: 'utf8' });
+
+  assert.match(output, /██████╗\s+██╗\s+██████╗██╗\s+██╗/);
+  assert.match(output, /0-1 CLI v0\.6\.15/);
+  assert.match(output, /树林曾云：从0到1是最贵的/);
+  assert.match(output, /希望这个CLI可以帮助你从0到1入门AI-CLI工具/);
+  assert.equal((output.match(/0-1 CLI v0\.6\.15/g) || []).length, 1);
+});
+
 test('guide menu keeps three switch targets and shows main chapter away from intro', () => {
   const { DEFAULT_GUIDE_KEY, getGuideMenuOptions } = require('../dist/modules/guide');
 
@@ -28,6 +38,15 @@ test('guide menu keeps three switch targets and shows main chapter away from int
   assert.equal(ccSwitchOptions.length, 3);
   assert.ok(ccSwitchOptions.some((option) => option.value === DEFAULT_GUIDE_KEY && option.label.includes('主章节')));
   assert.ok(!ccSwitchOptions.some((option) => option.value === 'cc-switch'));
+});
+
+test('guide chapters have distinct theme colors', () => {
+  const { GUIDE_CHAPTERS, getGuideChapterColorName } = require('../dist/modules/guide');
+  const colors = GUIDE_CHAPTERS.map((chapter) => getGuideChapterColorName(chapter.key));
+
+  assert.equal(colors.length, 4);
+  assert.equal(new Set(colors).size, 4);
+  assert.deepEqual(colors, ['cyan', 'magenta', 'yellow', 'green']);
 });
 
 test('help exposes state, api, and pay routes', () => {

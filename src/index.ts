@@ -173,7 +173,7 @@ program
       return;
     }
 
-    await handleGuide();
+    await handleGuide(VERSION);
   });
 
 program.parse(process.argv);

@@ -1,8 +1,27 @@
 import chalk from 'chalk';
 import { SelectorOption, interactiveSelect } from '../../utils/selector';
+import { renderHomeHeader } from '../home';
 import { DEFAULT_GUIDE_KEY, GUIDE_CHAPTERS, getGuideChapter, renderGuideChapter } from './chapters';
 
 export { DEFAULT_GUIDE_KEY, GUIDE_CHAPTERS, renderGuideChapter };
+
+type GuideColorName = 'cyan' | 'magenta' | 'yellow' | 'green';
+
+const GUIDE_COLORS: Record<string, GuideColorName> = {
+  [DEFAULT_GUIDE_KEY]: 'cyan',
+  'cc-switch': 'magenta',
+  vpn: 'yellow',
+  community: 'green',
+};
+
+export function getGuideChapterColorName(key: string): GuideColorName {
+  return GUIDE_COLORS[key] || 'cyan';
+}
+
+export function formatGuideChapter(key: string): string {
+  const color = getGuideChapterColorName(key);
+  return chalk[color](renderGuideChapter(key));
+}
 
 export function getGuideMenuOptions(currentKey: string): SelectorOption[] {
   return GUIDE_CHAPTERS
@@ -22,7 +41,7 @@ function getGuideMenuTitle(currentKey: string): string {
 }
 
 function printChapter(key: string): void {
-  console.log(chalk.cyan(renderGuideChapter(key)));
+  console.log(formatGuideChapter(key));
 }
 
 function printNonInteractiveMenu(currentKey: string): void {
@@ -32,8 +51,9 @@ function printNonInteractiveMenu(currentKey: string): void {
   });
 }
 
-export async function handleGuide(): Promise<void> {
+export async function handleGuide(version = '0.6.15'): Promise<void> {
   let currentKey = DEFAULT_GUIDE_KEY;
+  console.log(renderHomeHeader(version));
   printChapter(currentKey);
 
   if (!process.stdin.isTTY) {
