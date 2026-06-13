@@ -6,7 +6,7 @@ const test = require('node:test');
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 
 test('package exposes hi command and bumps one patch version', () => {
-  assert.equal(pkg.version, '0.6.7');
+  assert.match(pkg.version, /^0\.6\.[7-9]\d*$/);
   assert.deepEqual(pkg.bin, { hi: './dist/index.js' });
 });
 

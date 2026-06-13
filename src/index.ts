@@ -29,7 +29,7 @@ import { runClear } from './modules/clear';
 import { renderHomeHeader } from './modules/home';
 
 const program = new Command();
-const VERSION = '0.6.7';
+const VERSION = '0.6.8';
 
 program
   .name('hi')
