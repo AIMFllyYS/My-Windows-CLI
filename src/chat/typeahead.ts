@@ -7,6 +7,8 @@ export interface SlashSuggestion {
   id: string;
   command: string;
   description: string;
+  argumentHint?: string;
+  loadedFrom?: SlashMenuItem['loadedFrom'];
 }
 
 export interface SlashTypeaheadState {
@@ -47,12 +49,32 @@ function toSuggestion(item: SlashMenuItem): SlashSuggestion {
     id: item.command,
     command: visibleCommand(item),
     description: item.description,
+    ...(item.argumentHint ? { argumentHint: item.argumentHint } : {}),
+    ...(item.loadedFrom ? { loadedFrom: item.loadedFrom } : {}),
   };
 }
 
-function matchesSlashQuery(item: SlashMenuItem, query: string): boolean {
-  const candidates = [visibleCommand(item), ...(item.aliases || [])];
-  return candidates.some((candidate) => candidate.toLowerCase().startsWith(query));
+function cleanQuery(value: string): string {
+  return value.toLowerCase().replace(/^\//, '').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function rankSlashMatch(item: SlashMenuItem, query: string): number {
+  if (query === '/') return 0;
+
+  const command = visibleCommand(item).toLowerCase();
+  const aliases = (item.aliases || []).map((alias) => alias.toLowerCase());
+  if (command === query) return 0;
+  if (aliases.some((alias) => alias === query)) return 1;
+  if (command.startsWith(query)) return 2;
+  if (aliases.some((alias) => alias.startsWith(query))) return 3;
+
+  const descriptionQuery = cleanQuery(query);
+  if (descriptionQuery) {
+    const descriptionWords = cleanQuery(item.description).split(/\s+/).filter(Boolean);
+    if (descriptionWords.some((word) => word.startsWith(descriptionQuery))) return 4;
+  }
+
+  return Number.POSITIVE_INFINITY;
 }
 
 export function createSlashTypeaheadState(input: string, mode: AiMode): SlashTypeaheadState {
@@ -63,8 +85,18 @@ export function createSlashTypeaheadState(input: string, mode: AiMode): SlashTyp
   const items = getSlashMenuItems(mode);
   const commandWidth = Math.max(...items.map((item) => item.command.length), 0);
   const query = input.trim().toLowerCase();
-  const suggestions = items
-    .filter((item) => matchesSlashQuery(item, query))
+  const rankedItems = items
+    .map((item) => ({ item, rank: rankSlashMatch(item, query) }))
+    .filter((entry) => entry.rank < Number.POSITIVE_INFINITY);
+  const hasNameOrAliasMatch = rankedItems.some((entry) => entry.rank < 4);
+  const suggestions = rankedItems
+    .filter((entry) => !hasNameOrAliasMatch || entry.rank < 4)
+    .sort((a, b) => {
+      const rankDiff = a.rank - b.rank;
+      if (rankDiff !== 0) return rankDiff;
+      return visibleCommand(a.item).length - visibleCommand(b.item).length;
+    })
+    .map((entry) => entry.item)
     .map(toSuggestion)
 
   return {
@@ -154,9 +186,11 @@ export function renderSlashTypeahead(state: SlashTypeaheadState): string {
     const actualIndex = start + index;
     const selected = actualIndex === state.selectedIndex;
     const prefix = selected ? chalk.green('›') : chalk.gray(' ');
-    const command = item.command.padEnd(state.commandWidth);
+    const commandText = `${item.command}${item.argumentHint ? ` ${item.argumentHint}` : ''}`;
+    const command = commandText.padEnd(state.commandWidth);
     const label = selected ? chalk.bold.white(command) : chalk.white(command);
-    return `${prefix} ${label} ${chalk.gray(item.description)}`;
+    const source = item.loadedFrom ? chalk.gray(` [${item.loadedFrom}]`) : '';
+    return `${prefix} ${label} ${chalk.gray(item.description)}${source}`;
   }).join('\n');
 }
 

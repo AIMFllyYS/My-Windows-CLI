@@ -140,6 +140,29 @@ test('slash menu exposes mode and runtime commands', () => {
   assert.ok(agentItems.includes('/skills'));
 });
 
+test('slash menu groups commands with Claude-style source metadata', () => {
+  const {
+    formatDescriptionWithSource,
+    formatSlashMenu,
+    getSlashCommandDefinitions,
+  } = require('../dist/chat/commands');
+
+  const menu = formatSlashMenu('agent');
+  const definitions = getSlashCommandDefinitions('agent');
+  const spawn = definitions.find((item) => item.command === '/agent spawn <task>');
+  const skill = definitions.find((item) => item.command === '/skill <id|name>');
+
+  assert.match(menu, /Mode/);
+  assert.match(menu, /Agent/);
+  assert.match(menu, /Runtime/);
+  assert.match(menu, /\[builtin\]/);
+  assert.equal(spawn.category, 'Agent');
+  assert.equal(spawn.loadedFrom, 'builtin');
+  assert.equal(spawn.argumentHint, '<task>');
+  assert.equal(skill.category, 'Runtime');
+  assert.equal(formatDescriptionWithSource(spawn), 'Start a scoped local subagent [builtin]');
+});
+
 test('slash command registry supports aliases arguments and hidden filtering', () => {
   const {
     getSlashCommandDefinitions,

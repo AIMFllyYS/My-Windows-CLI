@@ -20,6 +20,20 @@ test('slash typeahead filters commands by query and keeps stable command width',
   assert.doesNotMatch(output, /\/chat\s+Switch/);
 });
 
+test('slash typeahead renders Claude-style argument hints and source badges', () => {
+  const { createSlashTypeaheadState, renderSlashTypeahead } = require('../dist/chat/typeahead');
+
+  const state = createSlashTypeaheadState('/agent s', 'agent');
+  const output = renderSlashTypeahead(state).replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+
+  assert.equal(state.active, true);
+  assert.equal(state.suggestions[0].command, '/agent spawn');
+  assert.equal(state.suggestions[0].argumentHint, '<task>');
+  assert.equal(state.suggestions[0].loadedFrom, 'builtin');
+  assert.match(output, /\/agent spawn <task>/);
+  assert.match(output, /\[builtin\]/);
+});
+
 test('slash typeahead can suggest commands through aliases without exposing account commands', () => {
   const { createSlashTypeaheadState } = require('../dist/chat/typeahead');
   const { getSlashCommandDefinitions } = require('../dist/chat/commands');
@@ -31,6 +45,16 @@ test('slash typeahead can suggest commands through aliases without exposing acco
   assert.equal(model.suggestions[0].command, '/model');
   assert.equal(exit.suggestions[0].command, '/exit');
   assert.doesNotMatch(exported, /login|logout|oauth|telemetry|analytics|subscription/);
+});
+
+test('slash typeahead ranks exact aliases before prefix matches and falls back to descriptions', () => {
+  const { createSlashTypeaheadState } = require('../dist/chat/typeahead');
+
+  const alias = createSlashTypeaheadState('/s', 'agent');
+  const description = createSlashTypeaheadState('/web', 'agent');
+
+  assert.equal(alias.suggestions[0].command, '/search');
+  assert.equal(description.suggestions[0].command, '/search');
 });
 
 test('slash suggestion helpers detect mid-input commands and best matches', () => {
