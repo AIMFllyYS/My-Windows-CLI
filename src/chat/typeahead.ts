@@ -23,6 +23,12 @@ export type SlashApplyAction =
   | { action: 'complete'; input: string }
   | { action: 'execute'; input: string };
 
+export interface MidInputSlashCommand {
+  token: string;
+  startPos: number;
+  partialCommand: string;
+}
+
 export interface SlashPromptOptions {
   prompt: string;
   mode: AiMode;
@@ -44,6 +50,11 @@ function toSuggestion(item: SlashMenuItem): SlashSuggestion {
   };
 }
 
+function matchesSlashQuery(item: SlashMenuItem, query: string): boolean {
+  const candidates = [visibleCommand(item), ...(item.aliases || [])];
+  return candidates.some((candidate) => candidate.toLowerCase().startsWith(query));
+}
+
 export function createSlashTypeaheadState(input: string, mode: AiMode): SlashTypeaheadState {
   if (!input.startsWith('/')) {
     return { active: false, input, mode, suggestions: [], selectedIndex: -1, commandWidth: 0 };
@@ -53,8 +64,8 @@ export function createSlashTypeaheadState(input: string, mode: AiMode): SlashTyp
   const commandWidth = Math.max(...items.map((item) => item.command.length), 0);
   const query = input.trim().toLowerCase();
   const suggestions = items
+    .filter((item) => matchesSlashQuery(item, query))
     .map(toSuggestion)
-    .filter((item) => item.command.toLowerCase().startsWith(query));
 
   return {
     active: suggestions.length > 0,
@@ -64,6 +75,54 @@ export function createSlashTypeaheadState(input: string, mode: AiMode): SlashTyp
     selectedIndex: suggestions.length > 0 ? 0 : -1,
     commandWidth,
   };
+}
+
+export function findMidInputSlashCommand(input: string, cursorOffset: number): MidInputSlashCommand | null {
+  if (input.startsWith('/')) return null;
+
+  const beforeCursor = input.slice(0, cursorOffset);
+  const match = beforeCursor.match(/\s\/([a-zA-Z0-9_:-]*)$/);
+  if (!match || match.index === undefined) return null;
+
+  const slashPos = match.index + 1;
+  const textAfterSlash = input.slice(slashPos + 1);
+  const commandMatch = textAfterSlash.match(/^[a-zA-Z0-9_:-]*/);
+  const fullCommand = commandMatch ? commandMatch[0] : '';
+  if (cursorOffset > slashPos + 1 + fullCommand.length) return null;
+
+  return {
+    token: '/' + fullCommand,
+    startPos: slashPos,
+    partialCommand: fullCommand,
+  };
+}
+
+export function getBestSlashCommandMatch(
+  partialCommand: string,
+  mode: AiMode,
+): { suffix: string; fullCommand: string } | null {
+  if (!partialCommand) return null;
+
+  const query = '/' + partialCommand.toLowerCase();
+  const suggestions = createSlashTypeaheadState(query, mode).suggestions;
+  const match = suggestions.find((item) => item.command.toLowerCase().startsWith(query));
+  if (!match) return null;
+
+  const suffix = match.command.slice(query.length);
+  return suffix ? { suffix, fullCommand: match.command } : null;
+}
+
+export function findSlashCommandPositions(text: string): Array<{ start: number; end: number }> {
+  const positions: Array<{ start: number; end: number }> = [];
+  const regex = /(^|[\s])(\/[a-zA-Z][a-zA-Z0-9:\-_]*)/g;
+  let match: RegExpExecArray | null = null;
+  while ((match = regex.exec(text)) !== null) {
+    const precedingChar = match[1] || '';
+    const commandName = match[2] || '';
+    const start = match.index + precedingChar.length;
+    positions.push({ start, end: start + commandName.length });
+  }
+  return positions;
 }
 
 export function moveSlashSelection(state: SlashTypeaheadState, delta: number): SlashTypeaheadState {

@@ -20,6 +20,44 @@ test('slash typeahead filters commands by query and keeps stable command width',
   assert.doesNotMatch(output, /\/chat\s+Switch/);
 });
 
+test('slash typeahead can suggest commands through aliases without exposing account commands', () => {
+  const { createSlashTypeaheadState } = require('../dist/chat/typeahead');
+  const { getSlashCommandDefinitions } = require('../dist/chat/commands');
+
+  const model = createSlashTypeaheadState('/m', 'agent');
+  const exit = createSlashTypeaheadState('/q', 'agent');
+  const exported = JSON.stringify(getSlashCommandDefinitions('agent')).toLowerCase();
+
+  assert.equal(model.suggestions[0].command, '/model');
+  assert.equal(exit.suggestions[0].command, '/exit');
+  assert.doesNotMatch(exported, /login|logout|oauth|telemetry|analytics|subscription/);
+});
+
+test('slash suggestion helpers detect mid-input commands and best matches', () => {
+  const {
+    findMidInputSlashCommand,
+    findSlashCommandPositions,
+    getBestSlashCommandMatch,
+  } = require('../dist/chat/typeahead');
+
+  assert.deepEqual(findMidInputSlashCommand('please /pla', 11), {
+    token: '/pla',
+    startPos: 7,
+    partialCommand: 'pla',
+  });
+  assert.equal(findMidInputSlashCommand('/pla', 4), null);
+  assert.deepEqual(getBestSlashCommandMatch('pla', 'agent'), {
+    suffix: 'n',
+    fullCommand: '/plan',
+  });
+
+  const positions = findSlashCommandPositions('try /plan then /model info');
+  assert.deepEqual(positions.slice(0, 2), [
+    { start: 4, end: 9 },
+    { start: 15, end: 21 },
+  ]);
+});
+
 test('slash typeahead selection cycles and applies tab versus enter actions', () => {
   const { createSlashTypeaheadState, moveSlashSelection, applySlashSelection } = require('../dist/chat/typeahead');
 

@@ -140,6 +140,30 @@ test('slash menu exposes mode and runtime commands', () => {
   assert.ok(agentItems.includes('/skills'));
 });
 
+test('slash command registry supports aliases arguments and hidden filtering', () => {
+  const {
+    getSlashCommandDefinitions,
+    parseSlashCommand,
+    resolveSlashCommand,
+  } = require('../dist/chat/commands');
+
+  const definitions = getSlashCommandDefinitions('agent');
+  const help = definitions.find((item) => item.command === '/help');
+  const exit = definitions.find((item) => item.command === '/exit');
+  const setting = definitions.find((item) => item.command === '/setting');
+  const hidden = definitions.filter((item) => item.isHidden);
+
+  assert.deepEqual(resolveSlashCommand('/h'), { command: '/help', args: '', rawCommand: '/h' });
+  assert.deepEqual(resolveSlashCommand('/settings'), { command: '/setting', args: '', rawCommand: '/settings' });
+  assert.deepEqual(resolveSlashCommand('/m glm-4.5'), { command: '/model', args: 'glm-4.5', rawCommand: '/m' });
+  assert.equal(resolveSlashCommand('/missing'), null);
+  assert.deepEqual(parseSlashCommand('/missing value'), { command: '/missing', args: 'value' });
+  assert.ok(help.aliases.includes('/h'));
+  assert.ok(exit.aliases.includes('/q'));
+  assert.equal(setting.argumentHint, 'URL / API Key / Model IDs');
+  assert.equal(hidden.length, 0);
+});
+
 test('chat runtime wires agent mode through tool-call loop', () => {
   const source = fs.readFileSync('src/chat/index.ts', 'utf8');
 
