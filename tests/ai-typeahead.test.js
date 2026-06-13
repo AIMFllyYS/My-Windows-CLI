@@ -102,6 +102,35 @@ test('slash typeahead selection cycles and applies tab versus enter actions', ()
   });
 });
 
+test('slash completion keeps argument hints display-only', () => {
+  const { createSlashTypeaheadState, applySlashSelection, renderSlashTypeahead } = require('../dist/chat/typeahead');
+
+  const state = createSlashTypeaheadState('/agent s', 'agent');
+  const rendered = renderSlashTypeahead(state).replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+
+  assert.match(rendered, /\/agent spawn <task>/);
+  assert.deepEqual(applySlashSelection(state, 'tab'), {
+    action: 'complete',
+    input: '/agent spawn ',
+  });
+  assert.deepEqual(applySlashSelection(state, 'enter'), {
+    action: 'execute',
+    input: '/agent spawn',
+  });
+});
+
+test('slash typeahead hides command suggestions after trailing space for arguments', () => {
+  const { createSlashTypeaheadState } = require('../dist/chat/typeahead');
+
+  const waitingForArgs = createSlashTypeaheadState('/agent spawn ', 'agent');
+  const completeModel = createSlashTypeaheadState('/model ', 'agent');
+
+  assert.equal(waitingForArgs.active, false);
+  assert.equal(waitingForArgs.suggestions.length, 0);
+  assert.equal(completeModel.active, false);
+  assert.equal(completeModel.suggestions.length, 0);
+});
+
 test('slash typeahead dismisses before global exit confirmation', () => {
   const { createSlashTypeaheadState, dismissSlashTypeahead } = require('../dist/chat/typeahead');
   const state = createSlashTypeaheadState('/agent', 'agent');

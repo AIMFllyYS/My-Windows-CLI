@@ -81,6 +81,9 @@ export function createSlashTypeaheadState(input: string, mode: AiMode): SlashTyp
   if (!input.startsWith('/')) {
     return { active: false, input, mode, suggestions: [], selectedIndex: -1, commandWidth: 0 };
   }
+  if (/\s$/.test(input)) {
+    return { active: false, input, mode, suggestions: [], selectedIndex: -1, commandWidth: 0 };
+  }
 
   const items = getSlashMenuItems(mode);
   const commandWidth = Math.max(...items.map((item) => item.command.length), 0);
