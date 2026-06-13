@@ -1,0 +1,182 @@
+import { InstallTarget } from './types';
+
+const nodeRequirement = {
+  command: 'node',
+  name: 'Node.js',
+  installHint: 'Install Node.js 18+ from https://nodejs.org/',
+};
+
+const npmRequirement = {
+  command: 'npm',
+  name: 'npm',
+  installHint: 'npm is bundled with Node.js: https://nodejs.org/',
+};
+
+const gitRequirement = {
+  command: 'git',
+  name: 'Git',
+  installHint: 'Install Git from https://git-scm.com/downloads',
+};
+
+export const CLI_INSTALL_TARGETS: InstallTarget[] = [
+  {
+    key: 'cc',
+    displayName: 'Claude Code',
+    category: 'cli',
+    aliases: ['claude', 'claude-code'],
+    description: 'Anthropic Claude Code CLI',
+    sourceUrl: 'https://code.claude.com/docs/en/overview',
+    requirements: [gitRequirement],
+    versionCommand: 'claude --version',
+    updateCommand: 'claude update',
+    commands: [
+      { platform: 'win32', command: 'powershell -ExecutionPolicy Bypass -Command "irm https://claude.ai/install.ps1 | iex"' },
+      { platform: 'all', command: 'curl -fsSL https://claude.ai/install.sh | bash' },
+    ],
+  },
+  {
+    key: 'kimi',
+    displayName: 'Kimi Code',
+    category: 'cli',
+    aliases: ['kimi-code', 'kimi-cli'],
+    description: 'Moonshot AI Kimi Code CLI',
+    sourceUrl: 'https://platform.moonshot.ai/docs/guide/kimi-cli-support',
+    requirements: [nodeRequirement, npmRequirement],
+    versionCommand: 'kimi --version',
+    updateCommand: 'kimi upgrade',
+    commands: [{ platform: 'all', command: 'npm install -g @moonshot-ai/kimi-code@latest' }],
+  },
+  {
+    key: 'codex',
+    displayName: 'OpenAI Codex CLI',
+    category: 'cli',
+    aliases: ['openai-codex'],
+    description: 'OpenAI Codex command line agent',
+    sourceUrl: 'https://developers.openai.com/codex/cli',
+    requirements: [],
+    versionCommand: 'codex --version',
+    updateCommand: 'npm install -g @openai/codex@latest',
+    commands: [
+      { platform: 'win32', command: 'powershell -ExecutionPolicy Bypass -Command "irm https://chatgpt.com/codex/install.ps1 | iex"' },
+      { platform: 'all', command: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh' },
+    ],
+  },
+  {
+    key: 'kiro',
+    displayName: 'Kiro CLI',
+    category: 'cli',
+    aliases: ['kiro-cli'],
+    description: 'Kiro command line agent',
+    sourceUrl: 'https://kiro.dev/docs/cli/installation/',
+    requirements: [],
+    versionCommand: 'kiro-cli version',
+    updateCommand: 'kiro-cli update --non-interactive',
+    commands: [
+      { platform: 'win32', command: 'powershell -ExecutionPolicy Bypass -Command "irm https://cli.kiro.dev/install.ps1 | iex"' },
+      { platform: 'all', command: 'curl -fsSL https://cli.kiro.dev/install | bash' },
+    ],
+  },
+  {
+    key: 'mimo',
+    displayName: 'Xiaomi MiMo Code',
+    category: 'cli',
+    aliases: ['mimo-code', 'xiaomi-mimo', 'mimocode'],
+    description: 'Xiaomi MiMo AI coding CLI',
+    sourceUrl: 'https://mimo.xiaomi.com/mimocode/install',
+    requirements: [nodeRequirement, npmRequirement],
+    versionCommand: 'mimo --version',
+    updateCommand: 'mimo upgrade',
+    commands: [
+      { platform: 'win32', command: 'npm install -g @mimo-ai/cli@latest' },
+      { platform: 'all', command: 'curl -fsSL https://mimo.xiaomi.com/install | bash' },
+    ],
+  },
+  {
+    key: 'antigravity',
+    displayName: 'Google Antigravity CLI',
+    category: 'cli',
+    aliases: ['agy'],
+    description: 'Google Antigravity command line tool',
+    sourceUrl: 'https://antigravity.google/docs/cli-install',
+    requirements: [],
+    versionCommand: 'agy --version',
+    commands: [
+      { platform: 'win32', command: 'powershell -ExecutionPolicy Bypass -Command "irm https://antigravity.google/cli/install.ps1 | iex"' },
+      { platform: 'all', command: 'curl -fsSL https://antigravity.google/cli/install.sh | bash' },
+    ],
+  },
+  {
+    key: 'opencode',
+    displayName: 'OpenCode',
+    category: 'cli',
+    aliases: ['open-code'],
+    description: 'OpenCode AI coding agent',
+    sourceUrl: 'https://opencode.ai/docs/',
+    requirements: [nodeRequirement, npmRequirement],
+    versionCommand: 'opencode --version',
+    updateCommand: 'opencode upgrade',
+    commands: [
+      { platform: 'win32', command: 'npm install -g opencode-ai@latest' },
+      { platform: 'all', command: 'curl -fsSL https://opencode.ai/install | bash' },
+    ],
+  },
+  {
+    key: 'openclaw',
+    displayName: 'OpenClaw',
+    category: 'cli',
+    aliases: ['open-claw'],
+    description: 'OpenClaw agent CLI',
+    sourceUrl: 'https://docs.openclaw.ai/install',
+    requirements: [],
+    versionCommand: 'openclaw --version',
+    updateCommand: 'openclaw update',
+    commands: [
+      { platform: 'win32', command: 'powershell -ExecutionPolicy Bypass -Command "iwr -useb https://openclaw.ai/install.ps1 | iex"' },
+      { platform: 'all', command: 'curl -fsSL https://openclaw.ai/install.sh | bash' },
+    ],
+  },
+  {
+    key: 'hermes',
+    displayName: 'Hermes Agent',
+    category: 'cli',
+    aliases: ['hermes-agent'],
+    description: 'Nous Research Hermes agent CLI',
+    sourceUrl: 'https://hermes-agent.nousresearch.com/docs/getting-started/installation',
+    requirements: [],
+    versionCommand: 'hermes --version',
+    updateCommand: 'hermes update',
+    commands: [
+      { platform: 'win32', command: 'powershell -ExecutionPolicy Bypass -Command "iex (irm https://hermes-agent.nousresearch.com/install.ps1)"' },
+      { platform: 'all', command: 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash' },
+    ],
+  },
+];
+
+export const IDE_INSTALL_TARGETS: InstallTarget[] = [
+  { key: 'vscode', displayName: 'Visual Studio Code', category: 'ide', aliases: ['vs-code', 'code'], description: 'Microsoft VS Code', sourceUrl: 'https://code.visualstudio.com/download', installUrl: 'https://code.visualstudio.com/download', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'codex-app', displayName: 'OpenAI Codex App', category: 'ide', aliases: ['codex-desktop', 'openai-codex-app'], description: 'OpenAI Codex desktop app', sourceUrl: 'https://developers.openai.com/codex/app', installUrl: 'https://developers.openai.com/codex/app', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'cursor', displayName: 'Cursor', category: 'ide', aliases: ['cursor-ide'], description: 'Cursor AI editor', sourceUrl: 'https://cursor.com/download', installUrl: 'https://cursor.com/download', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'trae', displayName: 'TRAE International', category: 'ide', aliases: ['trae-ai'], description: 'TRAE international IDE', sourceUrl: 'https://www.trae.ai/download', installUrl: 'https://www.trae.ai/download', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'windsuf', displayName: 'Devin Desktop', category: 'ide', aliases: ['windsurf', 'devin', 'devin-desktop'], description: 'Windsurf is now Devin Desktop', sourceUrl: 'https://devin.ai/download/', installUrl: 'https://devin.ai/download/', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'zed', displayName: 'Zed', category: 'ide', aliases: ['zed-editor'], description: 'Zed editor', sourceUrl: 'https://zed.dev/download', installUrl: 'https://zed.dev/download', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'antigravity-ide', displayName: 'Google Antigravity', category: 'ide', aliases: ['antigravity-ide'], description: 'Google Antigravity IDE', sourceUrl: 'https://antigravity.google/download', installUrl: 'https://antigravity.google/download', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'qoder', displayName: 'Qoder', category: 'ide', aliases: ['qoder-ide'], description: 'Qoder IDE', sourceUrl: 'https://qoder.com/en/download', installUrl: 'https://qoder.com/en/download', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'codebuddy', displayName: 'CodeBuddy', category: 'ide', aliases: ['tencent-codebuddy'], description: 'Tencent Cloud CodeBuddy IDE', sourceUrl: 'https://www.codebuddy.ai/ide', installUrl: 'https://www.codebuddy.ai/ide', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'workbuddy', displayName: 'WorkBuddy', category: 'ide', aliases: ['tencent-workbuddy'], description: 'Tencent WorkBuddy', sourceUrl: 'https://www.codebuddy.cn/work/', installUrl: 'https://www.codebuddy.cn/work/', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'trae-solo', displayName: 'TRAE SOLO', category: 'ide', aliases: ['trae_solo', 'solo', 'trae-work'], description: 'TRAE Work / SOLO mode', sourceUrl: 'https://www.trae.ai/work', installUrl: 'https://www.trae.ai/work', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'qoderwork', displayName: 'QoderWork CN', category: 'ide', aliases: ['qoder-work', 'qoderwork-cn'], description: 'QoderWork referral link', sourceUrl: 'https://qoder.com.cn/download', installUrl: 'https://qoder.com.cn/referral?referral_code=P9b0VxYaYr0QT20RHfL9tp3294ooCeIe', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'kiro-ide', displayName: 'Kiro IDE', category: 'ide', aliases: ['kiro-desktop'], description: 'Kiro IDE downloads', sourceUrl: 'https://kiro.dev/downloads/', installUrl: 'https://kiro.dev/downloads/', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'trae-cn', displayName: 'TRAE CN', category: 'ide', aliases: ['trae_cn', 'trae-china'], description: 'TRAE China IDE', sourceUrl: 'https://www.trae.cn/ide/download', installUrl: 'https://www.trae.cn/ide/download', requirements: [], commands: [], opensUrlOnly: true },
+];
+
+export const ENV_INSTALL_TARGETS: InstallTarget[] = [
+  { key: 'proxy', displayName: 'Sibker proxy environment', category: 'environment', aliases: ['magic', 'magic-env', 'sibker'], description: 'Proxy environment service', sourceUrl: 'https://www.sibker.com/register?invite_code=LOO3ipxE', installUrl: 'https://www.sibker.com/register?invite_code=LOO3ipxE', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'virtual-card', displayName: 'SupayCard virtual card', category: 'environment', aliases: ['supaycard', 'card'], description: 'Virtual card recommendation', sourceUrl: 'https://www.supaycard.com/landingView?ref=vggONf', installUrl: 'https://www.supaycard.com/landingView?ref=vggONf', requirements: [], commands: [], opensUrlOnly: true },
+  { key: 'fingerprint-browser', displayName: 'AdsPower fingerprint browser', category: 'environment', aliases: ['adspower', 'browser'], description: 'Fingerprint browser recommendation', sourceUrl: 'https://www.adspower.net/share/NbSkYx', installUrl: 'https://www.adspower.net/share/NbSkYx', requirements: [], commands: [], opensUrlOnly: true },
+];
+
+export const ALL_INSTALL_TARGETS = [
+  ...CLI_INSTALL_TARGETS,
+  ...IDE_INSTALL_TARGETS,
+  ...ENV_INSTALL_TARGETS,
+];

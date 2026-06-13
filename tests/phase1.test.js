@@ -6,7 +6,9 @@ const test = require('node:test');
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 
 test('package exposes hi command and bumps one patch version', () => {
-  assert.match(pkg.version, /^0\.6\.[7-9]\d*$/);
+  const [, minor, patch] = pkg.version.match(/^0\.(\d+)\.(\d+)$/).map(Number);
+  assert.equal(minor, 6);
+  assert.ok(patch >= 7);
   assert.deepEqual(pkg.bin, { hi: './dist/index.js' });
 });
 

@@ -27,14 +27,16 @@ import { getApps } from './modules/apps';
 import { startChat } from './chat';
 import { runClear } from './modules/clear';
 import { renderHomeHeader } from './modules/home';
+import { handleInstall, parseInstallArgs } from './modules/install';
 
 const program = new Command();
-const VERSION = '0.6.9';
+const VERSION = '0.6.10';
 
 program
   .name('hi')
   .description('0-1 CLI - AI CLI onboarding and development toolbox')
   .version(VERSION)
+  .allowUnknownOption(true)
   // Basic info options
   .option('-s, --short', 'Short output (key info only)')
   .option('--paths', 'Show project paths only')
@@ -51,6 +53,8 @@ program
   .option('-C, --chat', 'Start AI chat mode (interactive)')
   .option('-A, --ai', 'Start AI chat mode (alias for --chat)')
   .option('-m, --model <model>', 'AI model (default: deepseek-chat)')
+  // Installer options
+  .option('--install [tool]', 'Install AI CLI tools, AI IDEs, or environment tools')
   // Cleanup options
   .option('--clear', '启用清理模式')
   .option('-p, --process', '清理无用后台进程（需配合 --clear）')
@@ -59,6 +63,11 @@ program
   .option('--clear-a', '快捷方式：同时进行进程和硬盘清理')
   // Action handler
   .action(async (opts) => {
+    if (opts.install !== undefined) {
+      await handleInstall(parseInstallArgs(process.argv.slice(2)));
+      return;
+    }
+
     // Clear: unified cleanup entry
     if (opts.clearA || (opts.clear && opts.all)) {
       await runClear('all');
