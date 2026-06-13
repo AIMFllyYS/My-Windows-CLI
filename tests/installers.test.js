@@ -30,3 +30,15 @@ test('installers do not hardcode auth tokens', () => {
   assert.doesNotMatch(combined, /SUPABASE_ACCESS_TOKEN=/);
   assert.doesNotMatch(combined, /GITHUB_PERSONAL_ACCESS_TOKEN=/);
 });
+
+test('docs and installers point to renamed 0-1-CLI repository', () => {
+  const combined = [
+    readFileSync('README.md', 'utf8'),
+    readFileSync('README_zh-CN.md', 'utf8'),
+    readFileSync('scripts/install.ps1', 'utf8'),
+    readFileSync('scripts/install.sh', 'utf8'),
+  ].join('\n');
+
+  assert.match(combined, /AIMFllyYS\/0-1-CLI/);
+  assert.doesNotMatch(combined, /AIMFllyYS\/My-Windows-CLI/);
+});

@@ -18,7 +18,7 @@ function githubGet(path: string, token?: string): Promise<any> {
       method: 'GET',
       agent: githubAgent,
       headers: {
-        'User-Agent': 'My-Windows-CLI',
+        'User-Agent': '0-1-CLI',
         'Accept': 'application/vnd.github+json',
         ...(token && { 'Authorization': `Bearer ${token}` })
       }

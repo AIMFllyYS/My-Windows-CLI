@@ -24,7 +24,7 @@
 推荐使用 `irm`，编码更稳定：
 
 ```powershell
-irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/master/scripts/install.ps1 | iex
 ```
 
 如果你的终端中文显示异常，先执行：
@@ -36,13 +36,13 @@ irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/in
 更稳的本地下载方式：
 
 ```powershell
-irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 -OutFile "$env:TEMP\install-hi-cli.ps1"; & "$env:TEMP\install-hi-cli.ps1"
+irm https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/master/scripts/install.ps1 -OutFile "$env:TEMP\install-hi-cli.ps1"; & "$env:TEMP\install-hi-cli.ps1"
 ```
 
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/master/scripts/install.sh | bash
 ```
 
 ## 安装指定版本
@@ -50,13 +50,13 @@ curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scr
 如果你想固定安装某个发布版本，把链接里的 `master` 换成对应 tag，例如：
 
 ```powershell
-irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/v0.6.15/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/v0.6.15/scripts/install.ps1 | iex
 ```
 
 macOS / Linux：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/v0.6.15/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/v0.6.15/scripts/install.sh | bash
 ```
 
 如果还没有发布 tag，就继续使用 `master` 安装最新主分支版本。
@@ -64,8 +64,8 @@ curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/v0.6.15/sc
 ## 本地开发安装
 
 ```bash
-git clone https://github.com/AIMFllyYS/My-Windows-CLI.git
-cd My-Windows-CLI
+git clone https://github.com/AIMFllyYS/0-1-CLI.git
+cd 0-1-CLI
 npm install
 npm run build
 npm link

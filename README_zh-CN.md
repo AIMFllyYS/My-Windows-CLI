@@ -3,7 +3,7 @@
 <!-- 徽章 -->
 <div align="center">
 
-[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/AIMFllyYS/My-Windows-CLI/blob/master/LICENSE)
+[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/AIMFllyYS/0-1-CLI/blob/master/LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
 
@@ -36,17 +36,17 @@
 
 **推荐方式（`irm` 编码更稳定）：**
 ```powershell
-irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/master/scripts/install.ps1 | iex
 ```
 
 **备选方式（先下载到本地再执行，最可靠）：**
 ```powershell
-irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 -OutFile "$env:TEMP\install-hi-cli.ps1"; & "$env:TEMP\install-hi-cli.ps1"
+irm https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/master/scripts/install.ps1 -OutFile "$env:TEMP\install-hi-cli.ps1"; & "$env:TEMP\install-hi-cli.ps1"
 ```
 
 **macOS / Linux：**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/master/scripts/install.sh | bash
 ```
 
 **本地源码安装（clone 后）：**
@@ -71,8 +71,8 @@ hi --help
 
 ```bash
 # 克隆仓库
-git clone https://github.com/AIMFllyYS/My-Windows-CLI.git
-cd My-Windows-CLI
+git clone https://github.com/AIMFllyYS/0-1-CLI.git
+cd 0-1-CLI
 
 # 安装依赖
 npm install
@@ -236,7 +236,7 @@ npm run clean
 ## 📁 项目结构
 
 ```
-My-Windows-CLI/
+0-1-CLI/
 ├── src/
 │   ├── index.ts              # 入口点和命令解析
 │   ├── modules/

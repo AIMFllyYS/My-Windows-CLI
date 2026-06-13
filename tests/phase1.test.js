@@ -23,6 +23,6 @@ test('runtime reports hi usage and package version', () => {
   });
 
   assert.equal(version, pkg.version);
-  assert.match(help, /Usage: hi \[options\]/);
+  assert.match(help, /用法：hi \[选项\]/);
   assert.match(help, /0-1 CLI/);
 });

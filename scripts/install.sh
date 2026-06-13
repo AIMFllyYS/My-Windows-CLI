@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="https://github.com/AIMFllyYS/My-Windows-CLI.git"
+REPO_URL="https://github.com/AIMFllyYS/0-1-CLI.git"
 DEFAULT_DIR="${HOME}/zero-one-cli"
 MIN_NODE_MAJOR=18
 SKIP_CONFIRM="${SKIP_CONFIRM:-false}"

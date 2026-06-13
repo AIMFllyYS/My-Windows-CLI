@@ -9,7 +9,7 @@ if ($Host.Version.Major -le 5) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 }
 
-$RepoUrl = "https://github.com/AIMFllyYS/My-Windows-CLI.git"
+$RepoUrl = "https://github.com/AIMFllyYS/0-1-CLI.git"
 $DefaultDir = "$env:USERPROFILE\zero-one-cli"
 $MinNodeMajor = 18
 
