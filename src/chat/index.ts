@@ -19,6 +19,7 @@ import { runAgentTurn } from './agent/loop';
 import { renderPermissionBox, renderStatusHeader, renderTimelineEntry } from './ui/layout';
 import { formatPermissionDecision } from './permissions/prompts';
 import { buildProviderToolSpecs } from './tools/registry';
+import { promptWithSlashTypeahead } from './typeahead';
 
 const AI_SESSION_EXIT = '__HI_AI_SESSION_EXIT__';
 
@@ -47,7 +48,21 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const pendingInput = createPendingInputController();
-  const ask = (): Promise<string> => pendingInput.wait((resolve) => rl.question(chalk.cyan('\n  ❯ '), resolve));
+  const ask = (): Promise<string> => pendingInput.wait((resolve) => {
+    const promptAbort = new AbortController();
+    activePromptAbort = promptAbort;
+    promptWithSlashTypeahead({
+      prompt: chalk.cyan('\n  ❯ '),
+      mode: session.mode,
+      signal: promptAbort.signal,
+      onOverlayChange: (active) => {
+        session.inSubmenu = active;
+      },
+    }).then((value) => {
+      if (activePromptAbort === promptAbort) activePromptAbort = null;
+      resolve(value);
+    });
+  });
   const askPrompt = async (prompt: string): Promise<string> => {
     const answer = await pendingInput.wait((resolve) => rl.question(prompt, resolve));
     if (shouldExit) throw new Error(AI_SESSION_EXIT);
@@ -57,6 +72,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
   let foregroundBusy = false;
   let shouldExit = false;
   let activeCancel: (() => void) | null = null;
+  let activePromptAbort: AbortController | null = null;
   let subagentCancel: (() => void) | null = null;
   let subagentWorkerActive = false;
   const hasActiveWork = (): boolean => foregroundBusy || Boolean(subagentCancel);
@@ -81,6 +97,8 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
     }
     if (result.action === 'exit') {
       shouldExit = true;
+      activePromptAbort?.abort();
+      activePromptAbort = null;
       pendingInput.resolveOnExit();
       return;
     }
