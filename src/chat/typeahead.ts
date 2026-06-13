@@ -147,6 +147,27 @@ export function getBestSlashCommandMatch(
   return suffix ? { suffix, fullCommand: match.command } : null;
 }
 
+export function applyMidInputSlashCompletion(
+  input: string,
+  cursorOffset: number,
+  mode: AiMode,
+): { input: string; cursorOffset: number; completedCommand: string } | null {
+  const midInput = findMidInputSlashCommand(input, cursorOffset);
+  if (!midInput) return null;
+
+  const match = getBestSlashCommandMatch(midInput.partialCommand, mode);
+  if (!match) return null;
+
+  const before = input.slice(0, midInput.startPos);
+  const after = input.slice(midInput.startPos + midInput.token.length);
+  const replacement = `${match.fullCommand} `;
+  return {
+    input: `${before}${replacement}${after}`,
+    cursorOffset: before.length + replacement.length,
+    completedCommand: match.fullCommand,
+  };
+}
+
 export function findSlashCommandPositions(text: string): Array<{ start: number; end: number }> {
   const positions: Array<{ start: number; end: number }> = [];
   const regex = /(^|[\s])(\/[a-zA-Z][a-zA-Z0-9:\-_]*)/g;

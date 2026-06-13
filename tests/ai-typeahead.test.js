@@ -59,6 +59,7 @@ test('slash typeahead ranks exact aliases before prefix matches and falls back t
 
 test('slash suggestion helpers detect mid-input commands and best matches', () => {
   const {
+    applyMidInputSlashCompletion,
     findMidInputSlashCommand,
     findSlashCommandPositions,
     getBestSlashCommandMatch,
@@ -74,6 +75,18 @@ test('slash suggestion helpers detect mid-input commands and best matches', () =
     suffix: 'n',
     fullCommand: '/plan',
   });
+  assert.deepEqual(applyMidInputSlashCompletion('please /pla', 11, 'agent'), {
+    input: 'please /plan ',
+    cursorOffset: 13,
+    completedCommand: '/plan',
+  });
+  assert.deepEqual(applyMidInputSlashCompletion('please /pla then continue', 11, 'agent'), {
+    input: 'please /plan  then continue',
+    cursorOffset: 13,
+    completedCommand: '/plan',
+  });
+  assert.equal(applyMidInputSlashCompletion('/pla', 4, 'agent'), null);
+  assert.equal(applyMidInputSlashCompletion('open /usr/bin', 9, 'agent'), null);
 
   const positions = findSlashCommandPositions('try /plan then /model info');
   assert.deepEqual(positions.slice(0, 2), [
