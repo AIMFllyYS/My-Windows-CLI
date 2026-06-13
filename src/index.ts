@@ -68,8 +68,10 @@ program
   .option('-a, --all', '同时清理进程和硬盘空间（需配合 --clear）')
   .option('--clear-a', '快捷方式：同时清理进程和硬盘空间')
   .action(async (opts) => {
+    const rawArgs = process.argv.slice(2);
+
     if (opts.install !== undefined) {
-      await handleInstall(parseInstallArgs(process.argv.slice(2)));
+      await handleInstall(parseInstallArgs(rawArgs));
       return;
     }
     if (opts.skills) {
@@ -170,6 +172,11 @@ program
     if (opts.apps) {
       console.log(chalk.bold('\nApp Launch Commands\n'));
       console.log(getApps());
+      return;
+    }
+
+    if (rawArgs.length > 0) {
+      program.outputHelp();
       return;
     }
 

@@ -27,6 +27,18 @@ test('hi startup prints logo and zero-one welcome copy once before guide', () =>
   assert.equal((output.match(/0-1 CLI v0\.6\.15/g) || []).length, 1);
 });
 
+test('unhandled hi arguments print help instead of the default guide', () => {
+  const positional = execFileSync('node', ['dist/index.js', 'whatever'], { encoding: 'utf8' });
+  const orphanTask = execFileSync('node', ['dist/index.js', '--task', 'demo'], { encoding: 'utf8' });
+
+  for (const output of [positional, orphanTask]) {
+    assert.match(output, /Usage: hi \[options\]/);
+    assert.match(output, /--state/);
+    assert.match(output, /--api/);
+    assert.doesNotMatch(output, /树林曾云：从0到1是最贵的/);
+  }
+});
+
 test('guide menu keeps three switch targets and shows main chapter away from intro', () => {
   const { DEFAULT_GUIDE_KEY, getGuideMenuOptions } = require('../dist/modules/guide');
 
