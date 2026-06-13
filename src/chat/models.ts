@@ -1,4 +1,5 @@
 import { ModelInfo } from '../types';
+import { parseAiEnv } from './config';
 
 export const MODELS: ModelInfo[] = [
   // DeepSeek V4
@@ -40,6 +41,21 @@ export const MODELS: ModelInfo[] = [
 
 export const DEFAULT_MODEL_ID = 'deepseek-v4-flash';
 
+export function getAvailableModels(env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env): ModelInfo[] {
+  const settings = parseAiEnv(env);
+  const configured = settings.modelIds
+    .filter((id) => !MODELS.some((model) => model.id === id))
+    .map((id) => ({
+      id,
+      name: id,
+      provider: 'custom' as const,
+      description: 'Custom configured model',
+      modalities: ['text'],
+    }));
+
+  return [...MODELS, ...configured];
+}
+
 export function getModelById(id: string): ModelInfo | undefined {
-  return MODELS.find(m => m.id === id);
+  return getAvailableModels().find(m => m.id === id);
 }

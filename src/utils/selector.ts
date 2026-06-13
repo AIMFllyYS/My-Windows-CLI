@@ -66,7 +66,9 @@ export async function interactiveSelect(config: SelectorConfig): Promise<void> {
 
       if (key.ctrl && key.name === 'c') {
         cleanup();
-        process.exit(0);
+        onCancel?.();
+        resolve();
+        return;
       }
 
       if (key.name === 'escape') {

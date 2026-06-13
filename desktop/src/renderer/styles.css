@@ -1,0 +1,210 @@
+:root {
+  color-scheme: dark;
+  font-family: "Aptos", "Segoe UI", sans-serif;
+  background: #101113;
+  color: #f4f0e8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 1100px;
+  min-height: 720px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    #101113;
+  background-size: 28px 28px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 248px minmax(520px, 1fr) 360px;
+  min-height: 100vh;
+}
+
+.sidebar,
+.inspector {
+  border-color: rgba(244, 240, 232, 0.12);
+  background: rgba(19, 20, 22, 0.86);
+  backdrop-filter: blur(16px);
+}
+
+.sidebar {
+  border-right: 1px solid rgba(244, 240, 232, 0.12);
+  padding: 22px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #9be7c7;
+  color: #9be7c7;
+  font-weight: 800;
+}
+
+.brand strong,
+.brand small {
+  display: block;
+}
+
+.brand small,
+.topbar p,
+.session em,
+.bubble span {
+  color: #9a9489;
+}
+
+.sessionList,
+.stack {
+  display: grid;
+  gap: 10px;
+}
+
+.session,
+.stack button,
+.tabs button,
+.modeSwitch button,
+.composer button {
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  border-radius: 6px;
+  background: #17191c;
+  color: #f4f0e8;
+  cursor: pointer;
+}
+
+.session {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  text-align: left;
+}
+
+.conversation {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 26px;
+  border-bottom: 1px solid rgba(244, 240, 232, 0.1);
+}
+
+.topbar h1,
+.topbar p {
+  margin: 0;
+}
+
+.topbar h1 {
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.modeSwitch,
+.tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.modeSwitch button,
+.tabs button {
+  padding: 8px 12px;
+}
+
+.selected {
+  border-color: #9be7c7 !important;
+  color: #9be7c7 !important;
+  background: rgba(155, 231, 199, 0.09) !important;
+}
+
+.thread {
+  padding: 28px;
+  overflow: auto;
+}
+
+.bubble {
+  max-width: 820px;
+  margin-bottom: 16px;
+  padding: 15px 16px;
+  border-left: 2px solid rgba(155, 231, 199, 0.45);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.bubble p {
+  margin: 7px 0 0;
+  line-height: 1.55;
+}
+
+.highlight {
+  border-left-color: #f0c36a;
+}
+
+.composer {
+  display: flex;
+  gap: 10px;
+  padding: 18px 26px;
+  border-top: 1px solid rgba(244, 240, 232, 0.1);
+}
+
+.composer input {
+  flex: 1;
+  border: 1px solid rgba(244, 240, 232, 0.16);
+  border-radius: 6px;
+  background: #15171a;
+  color: #f4f0e8;
+  padding: 12px;
+}
+
+.composer button,
+.stack button {
+  padding: 11px 14px;
+}
+
+.inspector {
+  border-left: 1px solid rgba(244, 240, 232, 0.12);
+  padding: 20px;
+}
+
+.tabs {
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.panel {
+  min-height: 190px;
+  padding: 14px;
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.output {
+  min-height: 240px;
+  margin-top: 16px;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: #0c0d0f;
+  color: #b9f8d3;
+  padding: 14px;
+}

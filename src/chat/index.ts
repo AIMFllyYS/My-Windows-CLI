@@ -1,48 +1,163 @@
 import * as readline from 'readline';
 import chalk from 'chalk';
 import { ChatMessage, ModelInfo } from '../types';
-import { MODELS, DEFAULT_MODEL_ID, getModelById } from './models';
+import { MODELS, DEFAULT_MODEL_ID, getAvailableModels, getModelById } from './models';
 import { streamChat } from './provider';
 import { webSearch } from './search';
 import { executeTool, getSystemPrompt, isToolCommand } from './tools';
-import { Spinner, drawBox, printSuccess, printError, printInfo, printWarning, printDivider, StreamRenderer } from './renderer';
+import { Spinner, printSuccess, printError, printInfo, printWarning, printDivider, StreamRenderer } from './renderer';
 import { interactiveSelect } from '../utils/selector';
+import { parseAiEnv, resolveEnvPath, writeAiSettings } from './config';
+import { parseSlashCommand, resolveModelCommand } from './commands';
+import { createInterruptController, createPendingInputController } from './interrupts';
+import { resolveModeCommand } from './modes';
+import { AiSessionState, createSessionState, setCurrentModel, setMode } from './session';
+import { ActiveRuntimeSkill, discoverRuntimeSkills, formatSkillContextMessage, formatSkillList, loadRuntimeSkillContent, resolveSkillSelection, RuntimeSkill, trimMessagesPreservingSkillContext, upsertSkillContextMessage } from './skills';
+import { createSubagentQueue, enqueueSubagent, cancelSubagent, formatSubagentList, resolveAgentCommand, runNextSubagent, setSubagentParentPermission } from './agent/subagents';
+import { SubagentQueue } from './agent/types';
+import { renderStatusHeader, renderTimelineEntry } from './ui/layout';
+import { formatPermissionDecision } from './permissions/prompts';
 
-export async function startChat(modelId?: string): Promise<void> {
-  let currentModel = getModelById(modelId || DEFAULT_MODEL_ID) || MODELS[0];
+const AI_SESSION_EXIT = '__HI_AI_SESSION_EXIT__';
+
+export interface StartChatOptions {
+  modelId?: string;
+  autoAccept?: boolean;
+}
+
+export async function startChat(options?: string | StartChatOptions): Promise<void> {
+  const startOptions = typeof options === 'string' ? { modelId: options } : (options || {});
+  const session = createSessionState({ modelId: startOptions.modelId || DEFAULT_MODEL_ID, autoAccept: startOptions.autoAccept });
+  session.subagents = createSubagentQueue({ parentPermissionMode: session.permissionMode });
+  let currentModel = getModelById(session.currentModelId) || MODELS[0];
+  const runtimeSkills = discoverRuntimeSkills();
+  const activeSkills = (): ActiveRuntimeSkill[] => runtimeSkills
+    .filter((skill) => session.activeSkillIds.includes(skill.id))
+    .map((skill) => loadRuntimeSkillContent(skill));
+  const syncSkillContext = (): void => upsertSkillContextMessage(messages, formatSkillContextMessage(activeSkills()));
   const messages: ChatMessage[] = [{ role: 'system', content: getSystemPrompt() }];
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const ask = (): Promise<string> => new Promise(r => rl.question(chalk.cyan('\n  ❯ '), r));
+  const pendingInput = createPendingInputController();
+  const ask = (): Promise<string> => pendingInput.wait((resolve) => rl.question(chalk.cyan('\n  ❯ '), resolve));
+  const askPrompt = async (prompt: string): Promise<string> => {
+    const answer = await pendingInput.wait((resolve) => rl.question(prompt, resolve));
+    if (shouldExit) throw new Error(AI_SESSION_EXIT);
+    return answer;
+  };
+  const interruptController = createInterruptController({ confirmWindowMs: 1200 });
+  let foregroundBusy = false;
+  let shouldExit = false;
+  let activeCancel: (() => void) | null = null;
+  let subagentCancel: (() => void) | null = null;
+  let subagentWorkerActive = false;
+  const hasActiveWork = (): boolean => foregroundBusy || Boolean(subagentCancel);
+  const handleInterrupt = (source: 'Ctrl+C' | 'Esc') => {
+    const result = interruptController.handle({ running: hasActiveWork(), inSubmenu: session.inSubmenu });
+    if (result.action === 'back') {
+      return;
+    }
+    if (result.action === 'cancel-running') {
+      if (foregroundBusy) {
+        activeCancel?.();
+        activeCancel = null;
+        foregroundBusy = false;
+      } else if (subagentCancel) {
+        subagentCancel();
+        subagentCancel = null;
+      } else {
+        foregroundBusy = false;
+      }
+      printWarning('已请求取消当前操作');
+      return;
+    }
+    if (result.action === 'exit') {
+      shouldExit = true;
+      pendingInput.resolveOnExit();
+      return;
+    }
+    printWarning(`再次按 ${source} 退出 AI 会话`);
+  };
+  const onSigint = () => {
+    handleInterrupt('Ctrl+C');
+  };
+  const onKeypress = (_str: string | undefined, key: readline.Key) => {
+    if (key?.ctrl && key.name === 'c') handleInterrupt('Ctrl+C');
+    if (key?.name === 'escape') handleInterrupt('Esc');
+  };
+  const wasRaw = process.stdin.isRaw;
+  readline.emitKeypressEvents(process.stdin, rl);
+  process.stdin.setRawMode?.(true);
+  process.on('SIGINT', onSigint);
+  process.stdin.on('keypress', onKeypress);
+  const runSearch = async (query: string, searchMessages: ChatMessage[], model: ModelInfo): Promise<void> => {
+    const searchAbort = new AbortController();
+    foregroundBusy = true;
+    activeCancel = () => searchAbort.abort();
+    try {
+      await doSearch(query, searchMessages, model, searchAbort.signal, (cancel) => {
+        activeCancel = cancel;
+      });
+    } finally {
+      activeCancel = null;
+      foregroundBusy = false;
+    }
+  };
+  const hooks: RuntimeHooks = {
+    askLine: askPrompt,
+    runSearch,
+    runtimeSkills,
+    syncSkillContext,
+    subagents: session.subagents,
+    isSubagentWorkerActive: () => subagentWorkerActive,
+    setSubagentWorkerActive: (active) => {
+      subagentWorkerActive = active;
+    },
+    setSubagentActiveWork: (cancel) => {
+      subagentCancel = cancel;
+    },
+  };
 
-  // Welcome banner
-  console.log('\n' + drawBox(
-    '🤖 Coding AI Chat',
-    `只读安全模式 · ${currentModel.name}`
-  ));
-  console.log('');
+  console.log(renderStatusHeader({
+    project: process.cwd().split(/[\\/]/).pop() || 'workspace',
+    mode: session.mode,
+    permissionMode: session.permissionMode,
+    model: currentModel.name,
+    activeSkills: session.activeSkillIds.length,
+    runningSubagents: session.subagents.items.filter((item) => item.status === 'running').length,
+  }));
   printInfo('输入问题开始对话，输入 /help 查看命令');
   printDivider();
 
-  while (true) {
+  try {
+  while (!shouldExit) {
     const input = (await ask()).trim();
     if (!input) continue;
 
     // === Slash Commands ===
     if (input.startsWith('/')) {
-      const handled = await handleCommand(input, currentModel, messages, rl);
+      const handled = await handleCommand(input, currentModel, messages, session, hooks);
       if (handled === 'exit') break;
       if (handled instanceof Object && 'model' in handled) {
         currentModel = handled.model;
+        setCurrentModel(session, currentModel.id);
         messages[0] = { role: 'system', content: getSystemPrompt() };
+        syncSkillContext();
       }
       continue;
     }
 
     // === Direct Tool Commands ===
     if (isToolCommand(input)) {
-      printInfo('执行工具...');
-      const result = await executeTool(input);
+      console.log(renderTimelineEntry({ kind: 'tool', status: 'running', label: input.split(/\s+/)[0], detail: input }));
+      foregroundBusy = true;
+      let result = '';
+      try {
+        result = await executeTool(input);
+      } finally {
+        foregroundBusy = false;
+      }
+      console.log(renderTimelineEntry({ kind: 'tool', status: result.startsWith('Error:') ? 'failed' : 'completed', label: input.split(/\s+/)[0], detail: input }));
       console.log(chalk.gray('\n  ┌── 工具结果 ──'));
       result.split('\n').forEach(l => console.log(chalk.gray('  │ ') + chalk.white(l)));
       console.log(chalk.gray('  └' + '─'.repeat(40)));
@@ -52,16 +167,29 @@ export async function startChat(modelId?: string): Promise<void> {
     // === Web Search (prefix: search / 搜索) ===
     if (/^(search|搜索)\s+/i.test(input)) {
       const query = input.replace(/^(search|搜索)\s+/i, '');
-      await doSearch(query, messages, currentModel);
+      await runSearch(query, messages, currentModel);
       continue;
     }
 
     // === AI Chat ===
     messages.push({ role: 'user', content: input });
-    await streamAIResponse(messages, currentModel);
+    foregroundBusy = true;
+    try {
+      await streamAIResponse(messages, currentModel, (cancel) => {
+        activeCancel = cancel;
+      });
+    } finally {
+      activeCancel = null;
+      foregroundBusy = false;
+    }
   }
 
+  } finally {
+  process.removeListener('SIGINT', onSigint);
+  process.stdin.removeListener('keypress', onKeypress);
+  if (!wasRaw) process.stdin.setRawMode?.(false);
   rl.close();
+  }
 }
 
 // === Slash Command Handler ===
@@ -70,15 +198,39 @@ interface CommandResult {
   model: ModelInfo;
 }
 
+interface RuntimeHooks {
+  askLine: (prompt: string) => Promise<string>;
+  runSearch: (query: string, messages: ChatMessage[], model: ModelInfo) => Promise<void>;
+  runtimeSkills: RuntimeSkill[];
+  syncSkillContext: () => void;
+  subagents: SubagentQueue;
+  isSubagentWorkerActive: () => boolean;
+  setSubagentWorkerActive: (active: boolean) => void;
+  setSubagentActiveWork: (cancel: (() => void) | null) => void;
+}
+
 async function handleCommand(
   input: string,
   currentModel: ModelInfo,
   messages: ChatMessage[],
-  _rl: readline.Interface
+  session: AiSessionState,
+  hooks: RuntimeHooks
 ): Promise<'exit' | 'continue' | CommandResult> {
-  const parts = input.split(/\s+/);
-  const cmd = parts[0].toLowerCase();
-  const args = parts.slice(1).join(' ');
+  const parsed = parseSlashCommand(input);
+  if (!parsed) return 'continue';
+  const cmd = parsed.command;
+  const args = parsed.args;
+  if (cmd === '/agent' && args.trim()) {
+    await handleAgentCommand(args, currentModel, session, hooks);
+    return 'continue';
+  }
+  const modeCommand = resolveModeCommand(cmd);
+  if (modeCommand) {
+    setMode(session, modeCommand.mode);
+    setSubagentParentPermission(hooks.subagents, session.permissionMode);
+    printSuccess(`已切换到 ${session.mode} 模式`);
+    return 'continue';
+  }
 
   switch (cmd) {
     case '/exit':
@@ -94,11 +246,47 @@ async function handleCommand(
 
     case '/model':
     case '/m':
-      return await switchModel(currentModel);
+      {
+        const modelCommand = resolveModelCommand(args);
+        if (modelCommand.kind === 'info') {
+          printModelInfo(currentModel);
+          return 'continue';
+        }
+        if (modelCommand.kind === 'select') {
+          const selected = getModelById(modelCommand.modelId);
+          if (!selected) {
+            printWarning('未知模型: ' + modelCommand.modelId);
+            return 'continue';
+          }
+          if (selected.provider === 'custom') process.env.AI_MODEL = selected.id;
+          printSuccess(`已切换到 ${selected.name}`);
+          return { model: selected };
+        }
+      }
+      return await switchModel(currentModel, session);
+
+    case '/setting':
+    case '/settings':
+      try {
+        await configureAiSettings(hooks.askLine);
+      } catch (error: any) {
+        if (error?.message === AI_SESSION_EXIT) return 'exit';
+        throw error;
+      }
+      return 'continue';
+
+    case '/skills':
+      printRuntimeSkills(hooks.runtimeSkills, session.activeSkillIds);
+      return 'continue';
+
+    case '/skill':
+      handleSkillCommand(args, hooks.runtimeSkills, session, hooks.syncSkillContext);
+      return 'continue';
 
     case '/clear':
     case '/c':
       messages.length = 1; // keep system prompt
+      hooks.syncSkillContext();
       printSuccess('对话已清空');
       return 'continue';
 
@@ -107,7 +295,7 @@ async function handleCommand(
       if (!args) {
         printWarning('用法: /search <查询内容>');
       } else {
-        await doSearch(args, messages, currentModel);
+        await hooks.runSearch(args, messages, currentModel);
       }
       return 'continue';
 
@@ -121,12 +309,181 @@ async function handleCommand(
   }
 }
 
+function printRuntimeSkills(skills: RuntimeSkill[], activeSkillIds: string[]): void {
+  console.log('');
+  console.log(chalk.bold.cyan('  Skills'));
+  printDivider();
+  console.log(formatSkillList(skills, activeSkillIds));
+  console.log('');
+}
+
+function handleSkillCommand(
+  args: string,
+  skills: RuntimeSkill[],
+  session: AiSessionState,
+  syncSkillContext: () => void
+): void {
+  if (!args.trim()) {
+    printRuntimeSkills(skills, session.activeSkillIds);
+    printInfo('用法: /skill <id|name>，/skill clear');
+    return;
+  }
+
+  const selection = resolveSkillSelection(args, skills);
+  if (selection.kind === 'clear') {
+    session.activeSkillIds = [];
+    syncSkillContext();
+    printSuccess('运行时 skills 已清空');
+    return;
+  }
+  if (selection.kind === 'missing') {
+    printWarning('未找到 skill: ' + selection.query);
+    return;
+  }
+
+  if (!session.activeSkillIds.includes(selection.skill.id)) {
+    session.activeSkillIds.push(selection.skill.id);
+  }
+  syncSkillContext();
+  printSuccess(`已启用 skill: ${selection.skill.name}`);
+}
+
+async function handleAgentCommand(
+  args: string,
+  currentModel: ModelInfo,
+  session: AiSessionState,
+  hooks: RuntimeHooks
+): Promise<void> {
+  const command = resolveAgentCommand(args);
+  setSubagentParentPermission(hooks.subagents, session.permissionMode);
+
+  if (command.kind === 'list') {
+    console.log('');
+    console.log(chalk.bold.cyan('  Subagents'));
+    printDivider();
+    console.log(formatSubagentList(hooks.subagents));
+    return;
+  }
+
+  if (command.kind === 'cancel') {
+    if (!command.id) {
+      printWarning('用法: /agent cancel <id>');
+      return;
+    }
+    try {
+      const cancelled = cancelSubagent(hooks.subagents, command.id);
+      if (cancelled.status === 'cancelled') {
+        console.log(renderTimelineEntry({ kind: 'subagent', status: 'cancelled', label: cancelled.id, detail: cancelled.prompt }));
+      } else {
+        console.log(renderTimelineEntry({ kind: 'subagent', status: cancelled.status, label: cancelled.id, detail: cancelled.prompt }));
+      }
+    } catch (error: any) {
+      printWarning(error.message);
+    }
+    return;
+  }
+
+  if (command.kind === 'spawn') {
+    if (!command.prompt) {
+      printWarning('用法: /agent spawn <任务>');
+      return;
+    }
+    const task = enqueueSubagent(hooks.subagents, {
+      prompt: command.prompt,
+      mode: session.mode === 'plan' ? 'plan' : 'agent',
+      permissionMode: session.permissionMode,
+      skillIds: session.activeSkillIds,
+      modelId: currentModel.id,
+    });
+    console.log(formatPermissionDecision({
+      decision: task.permissionMode === 'ask' ? 'ask' : 'allow',
+      reason: `subagent runs in ${task.permissionMode} permission mode`,
+    }, 'subagent'));
+    console.log(renderTimelineEntry({ kind: 'subagent', status: 'queued', label: task.id, detail: task.prompt }));
+    runSubagentQueueInBackground(hooks);
+    return;
+  }
+
+  if (command.kind === 'unknown') {
+    printWarning('未知 agent 命令: ' + command.value);
+    return;
+  }
+
+  setMode(session, 'agent');
+  setSubagentParentPermission(hooks.subagents, session.permissionMode);
+  printSuccess(`已切换到 ${session.mode} 模式`);
+}
+
+function runSubagentQueueInBackground(hooks: RuntimeHooks): void {
+  if (hooks.isSubagentWorkerActive()) return;
+  hooks.setSubagentWorkerActive(true);
+
+  const loop = async (): Promise<void> => {
+    try {
+      while (hooks.subagents.items.some((item) => item.status === 'queued')) {
+        const next = hooks.subagents.items.find((item) => item.status === 'queued');
+        if (!next) break;
+        hooks.setSubagentActiveWork(() => {
+          try {
+            cancelSubagent(hooks.subagents, next.id);
+          } catch {
+            // The task may have completed between keypress and cancellation.
+          }
+        });
+        const completed = await runNextSubagent(hooks.subagents);
+        console.log(renderTimelineEntry({
+          kind: 'subagent',
+          status: completed.status,
+          label: completed.id,
+          detail: completed.result?.summary || completed.error || completed.prompt,
+        }));
+      }
+    } finally {
+      hooks.setSubagentActiveWork(null);
+      hooks.setSubagentWorkerActive(false);
+    }
+  };
+
+  void loop();
+}
+
+async function configureAiSettings(askLine: (prompt: string) => Promise<string>): Promise<void> {
+  const current = parseAiEnv(process.env);
+  console.log('');
+  console.log(chalk.bold.cyan('  AI 设置'));
+  printDivider();
+  const baseUrl = (await askLine(chalk.cyan(`  URL [${current.baseUrl || 'https://api.example.com/v1'}]: `))).trim() || current.baseUrl;
+  const apiKey = (await askLine(chalk.cyan(`  API Key [${current.apiKey ? '已配置' : '空'}]: `))).trim() || current.apiKey;
+  const modelInput = (await askLine(chalk.cyan(`  Model ID（英文逗号分隔） [${current.modelIds.join(',') || 'model-id'}]: `))).trim();
+  const modelIds = (modelInput || current.modelIds.join(','))
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (!baseUrl || !apiKey || modelIds.length === 0) {
+    printWarning('URL、API Key 和 Model ID 都不能为空');
+    return;
+  }
+
+  const activeModelId = modelIds.includes(current.activeModelId) ? current.activeModelId : modelIds[0];
+  writeAiSettings(resolveEnvPath(), { baseUrl, apiKey, modelIds, activeModelId });
+  process.env.AI_BASE_URL = baseUrl;
+  process.env.AI_API_KEY = apiKey;
+  process.env.AI_MODELS = modelIds.join(',');
+  process.env.AI_MODEL = activeModelId;
+  printSuccess(`AI 设置已保存，当前模型 ${activeModelId}`);
+}
+
 function printHelp(): void {
   console.log('');
   console.log(chalk.bold.cyan('  📖 命令列表'));
   printDivider();
   const cmds = [
     ['/model, /m', '切换 AI 模型'],
+    ['/skills', '列出运行时 skills'],
+    ['/skill <id|name>', '启用 skill，clear 清空'],
+    ['/agent spawn <task>', '启动本地 subagent'],
+    ['/agent list|cancel <id>', '查看或取消 subagent'],
     ['/search, /s <query>', '网络搜索'],
     ['/clear, /c', '清空对话历史'],
     ['/info', '当前模型信息'],
@@ -151,12 +508,13 @@ function printHelp(): void {
   console.log('');
 }
 
-async function switchModel(current: ModelInfo): Promise<'continue' | CommandResult> {
+async function switchModel(current: ModelInfo, session?: AiSessionState): Promise<'continue' | CommandResult> {
   console.log('');
   console.log(chalk.bold.cyan('  🔄 选择模型'));
   printDivider();
 
-  const options = MODELS.map(m => ({
+  const availableModels = getAvailableModels();
+  const options = availableModels.map(m => ({
     label: `${m.name}${m.id === current.id ? chalk.green(' (当前)') : ''}`,
     value: m.id,
     description: `${m.description}${m.supportsSearch ? ' 🔍' : ''}`,
@@ -164,16 +522,24 @@ async function switchModel(current: ModelInfo): Promise<'continue' | CommandResu
 
   let selected: ModelInfo | null = null;
 
-  await interactiveSelect({
-    title: '  选择模型:',
-    options,
-    onSelect: (value) => {
-      selected = getModelById(value) || null;
-    },
-    onCancel: () => { /* do nothing */ },
-  });
+  if (session) session.inSubmenu = true;
+  try {
+    await interactiveSelect({
+      title: '  选择模型:',
+      options,
+      onSelect: (value) => {
+        selected = getModelById(value) || null;
+      },
+      onCancel: () => { /* do nothing */ },
+    });
+  } finally {
+    if (session) session.inSubmenu = false;
+  }
 
   if (selected) {
+    if ((selected as ModelInfo).provider === 'custom') {
+      process.env.AI_MODEL = (selected as ModelInfo).id;
+    }
     printSuccess(`已切换到 ${(selected as ModelInfo).name}`);
     return { model: selected };
   }
@@ -191,11 +557,18 @@ function printModelInfo(model: ModelInfo): void {
   console.log('');
 }
 
-async function doSearch(query: string, messages: ChatMessage[], model: ModelInfo): Promise<void> {
+async function doSearch(
+  query: string,
+  messages: ChatMessage[],
+  model: ModelInfo,
+  signal?: AbortSignal,
+  onCancelReady?: (cancel: () => void) => void
+): Promise<void> {
   const spinner = new Spinner('搜索中');
   spinner.start();
   try {
-    const results = await webSearch(query);
+    const results = await webSearch(query, 5, signal);
+    if (signal?.aborted) return;
     spinner.stop();
     console.log(chalk.bold.blue('\n  🔍 搜索结果: ') + chalk.white(query));
     printDivider();
@@ -224,15 +597,21 @@ async function doSearch(query: string, messages: ChatMessage[], model: ModelInfo
     });
 
     // Auto-trigger AI to summarize
-    await streamAIResponse(messages, model);
+    if (signal?.aborted) return;
+    await streamAIResponse(messages, model, onCancelReady);
   } catch (e: any) {
     spinner.stop();
+    if (signal?.aborted || e.message === 'Search cancelled') return;
     printError('搜索失败: ' + e.message);
   }
 }
 
 /** Shared streaming AI response handler */
-async function streamAIResponse(messages: ChatMessage[], model: ModelInfo): Promise<void> {
+async function streamAIResponse(
+  messages: ChatMessage[],
+  model: ModelInfo,
+  onCancelReady?: (cancel: () => void) => void
+): Promise<void> {
   const spinner = new Spinner('AI 思考中');
   spinner.start();
 
@@ -241,7 +620,7 @@ async function streamAIResponse(messages: ChatMessage[], model: ModelInfo): Prom
       let reasoningStarted = false;
       const renderer = new StreamRenderer();
 
-      streamChat(messages, model, {
+      const handle = streamChat(messages, model, {
         onToken: (token) => {
           if (spinner.isRunning()) spinner.stop();
           renderer.push(token);
@@ -269,16 +648,12 @@ async function streamAIResponse(messages: ChatMessage[], model: ModelInfo): Prom
           reject(err);
         },
       });
+      onCancelReady?.(handle.abort);
     });
 
     messages.push({ role: 'assistant', content: response });
 
-    // Trim history to prevent unbounded growth (keep system + last 19 messages)
-    if (messages.length > 20) {
-      const system = messages[0];
-      messages.splice(1, messages.length - 20);
-      if (messages[0].role !== 'system') messages.unshift(system);
-    }
+    trimMessagesPreservingSkillContext(messages, 20);
   } catch (e: any) {
     spinner.stop();
     printError('API 错误: ' + e.message);

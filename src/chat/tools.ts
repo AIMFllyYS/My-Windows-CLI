@@ -1,7 +1,7 @@
 import * as fs from 'fs';
-import * as path from 'path';
-import { exec } from 'child_process';
 import { getProjectRoot } from '../utils/config';
+import { listFilesTool, readFileTool, searchFilesTool } from './tools/fs-read';
+import { toolForLegacyCommand } from './tools/registry';
 
 /**
  * Read-only tools for AI chat.
@@ -13,50 +13,23 @@ export async function executeTool(command: string): Promise<string> {
   const parts = trimmed.split(/\s+/);
   const cmd = parts[0].toLowerCase();
   const args = parts.slice(1).join(' ');
+  const workspaceRoot = process.cwd();
+  const tool = toolForLegacyCommand(cmd);
+  if (!tool) return 'Unknown tool: ' + cmd + '\n可用工具: ls, dir, read, grep';
 
-  // ls / dir
-  if (cmd === 'ls' || cmd === 'dir') {
-    const target = args || '.';
-    try {
-      const resolved = path.isAbsolute(target) ? target : path.resolve(target);
-      const entries = fs.readdirSync(resolved, { withFileTypes: true });
-      return entries.map(e => {
-        const type = e.isDirectory() ? '[DIR] ' : '      ';
-        return type + e.name;
-      }).join('\n') || '(empty directory)';
-    } catch (e: any) {
-      return 'Error: ' + e.message;
-    }
+  if (tool.name === 'list_files') {
+    return listFilesTool({ path: args || '.', workspaceRoot });
   }
 
-  // read / cat / type
-  if (cmd === 'read' || cmd === 'cat' || cmd === 'type') {
+  if (tool.name === 'read_file') {
     if (!args) return 'Error: 请指定文件名';
-    try {
-      const filepath = path.isAbsolute(args) ? args : path.resolve(args);
-      const content = fs.readFileSync(filepath, 'utf-8');
-      const lines = content.split('\n');
-      if (lines.length > 200) {
-        return lines.slice(0, 200).join('\n') + '\n... (截断，仅显示前200行)';
-      }
-      return content;
-    } catch (e: any) {
-      return 'Error: ' + e.message;
-    }
+    return readFileTool({ path: args, workspaceRoot });
   }
 
-  // grep (read-only search) — async to avoid blocking event loop
-  if (cmd === 'grep' || cmd === 'rg') {
-    return new Promise((resolve) => {
-      exec(trimmed, { cwd: process.cwd(), encoding: 'utf-8', timeout: 10000 }, (error, stdout) => {
-        if (error) {
-          if (error.code === 1) resolve('(no matches)');
-          else resolve('Error: ' + (error.message || '执行失败'));
-        } else {
-          resolve(stdout || '(no matches)');
-        }
-      });
-    });
+  if (tool.name === 'search_files') {
+    const [pattern, ...rest] = args.split(/\s+/);
+    if (!pattern) return 'Error: 请提供搜索内容';
+    return searchFilesTool({ pattern, path: rest.join(' ') || '.', workspaceRoot });
   }
 
   return 'Unknown tool: ' + cmd + '\n可用工具: ls, dir, read, grep';
