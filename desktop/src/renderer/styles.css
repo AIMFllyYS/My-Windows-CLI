@@ -203,7 +203,9 @@ input {
 }
 
 .commandCard span,
-.stack p {
+.stack p,
+.installTarget span,
+.confirmStrip span {
   color: #b8b0a3;
   line-height: 1.45;
 }
@@ -215,6 +217,95 @@ input {
 .releaseStatus {
   color: #b8b0a3;
   font-size: 13px;
+}
+
+.installPanel {
+  display: grid;
+  gap: 14px;
+}
+
+.panelHeader,
+.confirmStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panelHeader p,
+.panelHeader h2 {
+  margin: 0;
+}
+
+.panelHeader p {
+  color: #9a9489;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.panelHeader h2 {
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.panelHeader button,
+.confirmStrip button,
+.categorySwitch button,
+.installTarget {
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  border-radius: 6px;
+  background: #17191c;
+  color: #f4f0e8;
+  cursor: pointer;
+}
+
+.panelHeader button,
+.confirmStrip button,
+.categorySwitch button {
+  padding: 8px 11px;
+}
+
+.categorySwitch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.installTargets {
+  display: grid;
+  gap: 9px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.installTarget {
+  display: grid;
+  gap: 6px;
+  padding: 11px;
+  text-align: left;
+}
+
+.selectedTarget {
+  border-color: #f0c36a;
+  background: rgba(240, 195, 106, 0.08);
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d8d0c2;
+  font-size: 13px;
+}
+
+.confirmStrip {
+  border-top: 1px solid rgba(244, 240, 232, 0.12);
+  padding-top: 12px;
+}
+
+.confirmStrip button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .inspector {

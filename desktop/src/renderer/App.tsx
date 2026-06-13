@@ -1,14 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { desktopActions, DesktopAction } from './action-catalog';
 import './styles.css';
 
 type Mode = 'chat' | 'agent' | 'plan';
 type Tab = 'plan' | 'tools' | 'diff' | 'preview' | 'settings';
-type CommandCard = {
-  id: string;
-  title: string;
-  command: string;
+type InstallCategory = 'cli' | 'ide' | 'environment';
+type InstallTarget = {
+  key: string;
+  displayName: string;
+  category: InstallCategory;
   description: string;
+  sourceUrl: string;
+  opensUrlOnly?: boolean;
 };
 
 declare global {
@@ -17,6 +21,8 @@ declare global {
       runCommand: (command: string) => Promise<{ ok: boolean; output: string }>;
       getLatestRelease: () => Promise<{ ok: boolean; tagName?: string; name?: string; htmlUrl?: string; publishedAt?: string; assets?: { name: string; browserDownloadUrl: string; size: number }[]; error?: string }>;
       openLatestRelease: () => Promise<{ ok: boolean; url: string; error?: string }>;
+      listInstallTargets: () => Promise<InstallTarget[]>;
+      runInstallTarget: (request: { key: string; latest?: boolean; confirm?: boolean }) => Promise<{ ok: boolean; output: string; requiresConfirmation?: boolean }>;
     };
   }
 }
@@ -32,18 +38,14 @@ const transcript = [
   { role: 'assistant', text: 'Choose a mode, review tools, then run focused CLI actions from the right pane.' },
 ];
 
-const commandCards: CommandCard[] = [
-  { id: 'clear', title: 'Clean workstation', command: 'hi --clear', description: 'Run the cleanup entrypoint with the same guardrails as the CLI.' },
-  { id: 'skills', title: 'Skills market', command: 'hi --skills', description: 'Open the skill installer and review available local skills.' },
-  { id: 'install', title: 'Install tools', command: 'hi --install', description: 'Open the installer flow for AI CLIs, IDE helpers, and environment tools.' },
-  { id: 'state', title: 'System state', command: 'hi --state', description: 'Show GitHub, project paths, commands, and app status.' },
-  { id: 'api', title: 'API platforms', command: 'hi --api', description: 'Open model API platform guidance.' },
-  { id: 'pay', title: 'Payment resources', command: 'hi --pay', description: 'Open payment and account resource guidance.' },
-];
-
 function App(): React.ReactElement {
   const [mode, setMode] = useState<Mode>('chat');
   const [tab, setTab] = useState<Tab>('tools');
+  const [activeAction, setActiveAction] = useState<DesktopAction['id'] | null>(null);
+  const [installTargets, setInstallTargets] = useState<InstallTarget[]>([]);
+  const [installCategory, setInstallCategory] = useState<InstallCategory>('cli');
+  const [selectedInstallKey, setSelectedInstallKey] = useState<string | null>(null);
+  const [installLatest, setInstallLatest] = useState(false);
   const [output, setOutput] = useState('Ready.');
   const [releaseStatus, setReleaseStatus] = useState('Release status not checked.');
   const modeLabel = useMemo(() => `${mode} / ${mode === 'plan' ? 'plan' : 'ask'}`, [mode]);
@@ -55,6 +57,35 @@ function App(): React.ReactElement {
     }
     const result = await window.zeroOneCli.runCommand(command);
     setOutput(result.output || (result.ok ? 'Done.' : 'Command failed.'));
+  }
+
+  async function openAction(action: DesktopAction): Promise<void> {
+    setActiveAction(action.id);
+    if (action.kind !== 'native-install') {
+      await runCommand(action.command);
+      return;
+    }
+    if (!window.zeroOneCli) {
+      setOutput('Desktop bridge is unavailable in browser preview.');
+      return;
+    }
+    const targets = await window.zeroOneCli.listInstallTargets();
+    setInstallTargets(targets);
+    setSelectedInstallKey(targets.find((item) => item.category === installCategory)?.key || null);
+    setOutput('Choose an install target, then confirm from the desktop panel.');
+  }
+
+  async function runSelectedInstall(): Promise<void> {
+    if (!window.zeroOneCli || !selectedInstallKey) {
+      setOutput('Select an install target first.');
+      return;
+    }
+    const result = await window.zeroOneCli.runInstallTarget({
+      key: selectedInstallKey,
+      latest: installLatest,
+      confirm: true,
+    });
+    setOutput(result.output || (result.ok ? 'Install action started.' : 'Install action failed.'));
   }
 
   async function checkLatestRelease(): Promise<void> {
@@ -144,16 +175,32 @@ function App(): React.ReactElement {
         </nav>
 
         <section className="panel">
-          {tab === 'tools' && (
+          {tab === 'tools' && activeAction !== 'install' && (
             <div className="commandGrid">
-              {commandCards.map((card) => (
-                <button className="commandCard" key={card.id} onClick={() => runCommand(card.command)}>
+              {desktopActions.map((card) => (
+                <button className="commandCard" key={card.id} onClick={() => void openAction(card)}>
                   <strong>{card.title}</strong>
                   <code>{card.command}</code>
                   <span>{card.description}</span>
                 </button>
               ))}
             </div>
+          )}
+          {tab === 'tools' && activeAction === 'install' && (
+            <InstallPanel
+              category={installCategory}
+              targets={installTargets}
+              selectedKey={selectedInstallKey}
+              latest={installLatest}
+              onBack={() => setActiveAction(null)}
+              onCategory={(category) => {
+                setInstallCategory(category);
+                setSelectedInstallKey(installTargets.find((item) => item.category === category)?.key || null);
+              }}
+              onSelect={setSelectedInstallKey}
+              onLatest={setInstallLatest}
+              onInstall={runSelectedInstall}
+            />
           )}
           {tab === 'plan' && <p>Plan mode is read-only. Use the CLI conversation to draft and review task plans.</p>}
           {tab === 'diff' && <p>Diff review is prepared for file-change summaries from future agent runs.</p>}
@@ -171,6 +218,58 @@ function App(): React.ReactElement {
         <pre className="output">{output}</pre>
       </aside>
     </main>
+  );
+}
+
+function InstallPanel(props: {
+  category: InstallCategory;
+  targets: InstallTarget[];
+  selectedKey: string | null;
+  latest: boolean;
+  onBack: () => void;
+  onCategory: (category: InstallCategory) => void;
+  onSelect: (key: string) => void;
+  onLatest: (latest: boolean) => void;
+  onInstall: () => void;
+}): React.ReactElement {
+  const visibleTargets = props.targets.filter((item) => item.category === props.category);
+  const selected = visibleTargets.find((item) => item.key === props.selectedKey) || visibleTargets[0];
+
+  return (
+    <div className="installPanel">
+      <div className="panelHeader">
+        <div>
+          <p>native desktop action</p>
+          <h2>Install tools</h2>
+        </div>
+        <button onClick={props.onBack}>Back</button>
+      </div>
+      <div className="categorySwitch" aria-label="Install category">
+        {(['cli', 'ide', 'environment'] as InstallCategory[]).map((category) => (
+          <button key={category} className={props.category === category ? 'selected' : ''} onClick={() => props.onCategory(category)}>
+            {category}
+          </button>
+        ))}
+      </div>
+      <div className="installTargets">
+        {visibleTargets.map((target) => (
+          <button key={target.key} className={props.selectedKey === target.key ? 'installTarget selectedTarget' : 'installTarget'} onClick={() => props.onSelect(target.key)}>
+            <strong>{target.displayName}</strong>
+            <span>{target.description}</span>
+          </button>
+        ))}
+      </div>
+      <label className="checkRow">
+        <input type="checkbox" checked={props.latest} onChange={(event) => props.onLatest(event.currentTarget.checked)} />
+        <span>Use latest/update path when the target supports it</span>
+      </label>
+      <div className="confirmStrip">
+        <span>{selected ? selected.sourceUrl : 'No targets in this category.'}</span>
+        <button disabled={!selected} onClick={() => void props.onInstall()}>
+          Confirm install
+        </button>
+      </div>
+    </div>
   );
 }
 

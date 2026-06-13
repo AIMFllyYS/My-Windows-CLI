@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import { runDesktopCli } from './cli-runner';
 import { getLatestRelease, getReleasePageUrl } from './github-release';
+import { listDesktopInstallTargets, runDesktopInstallTarget } from './install-actions';
 
 function isAllowedRendererUrl(value: string): boolean {
   try {
@@ -64,6 +65,18 @@ app.whenReady().then(() => {
     }
     await shell.openExternal(url);
     return { ok: true, url };
+  });
+  ipcMain.handle('desktop-install:list', (event) => {
+    const senderUrl = event.senderFrame?.url || '';
+    if (!isTrustedSender(senderUrl)) return [];
+    return listDesktopInstallTargets();
+  });
+  ipcMain.handle('desktop-install:run', (event, request) => {
+    const senderUrl = event.senderFrame?.url || '';
+    if (!isTrustedSender(senderUrl)) {
+      return { ok: false, output: 'IPC sender is not trusted.' };
+    }
+    return runDesktopInstallTarget(request);
   });
   createWindow();
 

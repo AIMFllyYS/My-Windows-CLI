@@ -9,7 +9,7 @@ const ALLOWED_COMMANDS = new Set([
 ]);
 
 export function isAllowedDesktopCommand(command: string): boolean {
-  return ALLOWED_COMMANDS.has(command);
+  return ALLOWED_COMMANDS.has(command.split(/\s+/)[0] || '');
 }
 
 export function normalizeDesktopCommand(command: string): string {

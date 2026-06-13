@@ -13,12 +13,13 @@ export function runDesktopCli(command: string): Promise<CliRunResult> {
   if (!isAllowedDesktopCommand(normalized)) {
     return Promise.resolve({ ok: false, output: `Command not allowed: ${command}` });
   }
+  const [entrypoint, ...args] = normalized.split(/\s+/).filter(Boolean);
 
   const cliPath = app.isPackaged
     ? path.join(process.resourcesPath, 'app.asar', 'dist', 'cli', 'index.js')
     : path.resolve(__dirname, '..', '..', '..', 'dist', 'index.js');
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [cliPath, `--${normalized}`], {
+    const child = spawn(process.execPath, [cliPath, `--${entrypoint}`, ...args], {
       cwd: path.resolve(__dirname, '..', '..', '..'),
       windowsHide: true,
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },

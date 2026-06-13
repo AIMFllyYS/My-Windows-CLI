@@ -72,15 +72,17 @@ test('desktop IPC bridge restricts renderer origin and noninteractive commands',
   const main = fs.readFileSync(path.join('desktop', 'src', 'main', 'main.ts'), 'utf8');
   const permissions = fs.readFileSync(path.join('desktop', 'src', 'main', 'permissions.ts'), 'utf8');
   const renderer = fs.readFileSync(path.join('desktop', 'src', 'renderer', 'App.tsx'), 'utf8');
+  const actions = fs.readFileSync(path.join('desktop', 'src', 'renderer', 'action-catalog.ts'), 'utf8');
 
   assert.match(main, /isAllowedRendererUrl/);
   assert.match(main, /senderFrame\?\.url/);
   assert.match(permissions, /'install'/);
   assert.match(permissions, /'skills'/);
   assert.match(permissions, /'clear'/);
-  assert.match(renderer, /hi --clear/);
-  assert.match(renderer, /hi --skills/);
-  assert.match(renderer, /hi --install/);
+  assert.match(renderer, /desktopActions/);
+  assert.match(actions, /hi --clear/);
+  assert.match(actions, /hi --skills/);
+  assert.match(actions, /hi --install/);
 });
 
 test('desktop builder is wired for GitHub release publishing', () => {
