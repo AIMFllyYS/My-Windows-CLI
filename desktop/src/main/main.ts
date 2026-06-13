@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import { runDesktopCli } from './cli-runner';
+import { getLatestRelease, getReleasePageUrl } from './github-release';
 
 function isAllowedRendererUrl(value: string): boolean {
   try {
@@ -36,13 +37,33 @@ function createWindow(): void {
   }
 }
 
+function isTrustedSender(value: string): boolean {
+  return value.startsWith('file:') || isAllowedRendererUrl(value);
+}
+
 app.whenReady().then(() => {
   ipcMain.handle('cli:run', (event, command: string) => {
     const senderUrl = event.senderFrame?.url || '';
-    if (senderUrl.startsWith('file:') || isAllowedRendererUrl(senderUrl)) {
+    if (isTrustedSender(senderUrl)) {
       return runDesktopCli(command);
     }
     return { ok: false, output: 'IPC sender is not trusted.' };
+  });
+  ipcMain.handle('release:getLatest', (event) => {
+    const senderUrl = event.senderFrame?.url || '';
+    if (!isTrustedSender(senderUrl)) {
+      return { ok: false, repo: 'AIMFllyYS/0-1-CLI', error: 'IPC sender is not trusted.' };
+    }
+    return getLatestRelease();
+  });
+  ipcMain.handle('release:openLatest', async (event) => {
+    const senderUrl = event.senderFrame?.url || '';
+    const url = getReleasePageUrl();
+    if (!isTrustedSender(senderUrl)) {
+      return { ok: false, url, error: 'IPC sender is not trusted.' };
+    }
+    await shell.openExternal(url);
+    return { ok: true, url };
   });
   createWindow();
 

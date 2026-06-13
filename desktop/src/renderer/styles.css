@@ -212,6 +212,11 @@ input {
   color: #9be7c7;
 }
 
+.releaseStatus {
+  color: #b8b0a3;
+  font-size: 13px;
+}
+
 .inspector {
   border-left: 1px solid rgba(244, 240, 232, 0.12);
   padding: 20px;

@@ -15,6 +15,8 @@ declare global {
   interface Window {
     zeroOneCli?: {
       runCommand: (command: string) => Promise<{ ok: boolean; output: string }>;
+      getLatestRelease: () => Promise<{ ok: boolean; tagName?: string; name?: string; htmlUrl?: string; publishedAt?: string; assets?: { name: string; browserDownloadUrl: string; size: number }[]; error?: string }>;
+      openLatestRelease: () => Promise<{ ok: boolean; url: string; error?: string }>;
     };
   }
 }
@@ -43,6 +45,7 @@ function App(): React.ReactElement {
   const [mode, setMode] = useState<Mode>('chat');
   const [tab, setTab] = useState<Tab>('tools');
   const [output, setOutput] = useState('Ready.');
+  const [releaseStatus, setReleaseStatus] = useState('Release status not checked.');
   const modeLabel = useMemo(() => `${mode} / ${mode === 'plan' ? 'plan' : 'ask'}`, [mode]);
 
   async function runCommand(command: string): Promise<void> {
@@ -52,6 +55,29 @@ function App(): React.ReactElement {
     }
     const result = await window.zeroOneCli.runCommand(command);
     setOutput(result.output || (result.ok ? 'Done.' : 'Command failed.'));
+  }
+
+  async function checkLatestRelease(): Promise<void> {
+    if (!window.zeroOneCli) {
+      setReleaseStatus('Desktop bridge is unavailable in browser preview.');
+      return;
+    }
+    const release = await window.zeroOneCli.getLatestRelease();
+    if (!release.ok) {
+      setReleaseStatus(release.error || 'Unable to read latest release.');
+      return;
+    }
+    const assetText = release.assets?.length ? `${release.assets.length} assets` : 'no assets';
+    setReleaseStatus(`${release.tagName || release.name || 'Latest release'} - ${assetText}`);
+  }
+
+  async function openLatestRelease(): Promise<void> {
+    if (!window.zeroOneCli) {
+      setReleaseStatus('Desktop bridge is unavailable in browser preview.');
+      return;
+    }
+    const result = await window.zeroOneCli.openLatestRelease();
+    setReleaseStatus(result.ok ? `Opened ${result.url}` : (result.error || 'Unable to open release page.'));
   }
 
   return (
@@ -135,7 +161,9 @@ function App(): React.ReactElement {
           {tab === 'settings' && (
             <div className="stack">
               <p>Use /setting in AI mode to configure URL, API key, and model IDs.</p>
-              <a href="https://github.com/" target="_blank" rel="noreferrer">Open GitHub Releases</a>
+              <button onClick={checkLatestRelease}>Check latest release</button>
+              <button onClick={openLatestRelease}>Open release page</button>
+              <span className="releaseStatus">{releaseStatus}</span>
             </div>
           )}
         </section>

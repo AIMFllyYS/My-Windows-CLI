@@ -34,6 +34,7 @@ test('desktop main preload and renderer entry files exist', () => {
     'desktop/index.html',
     'desktop/src/main/main.ts',
     'desktop/src/main/cli-runner.ts',
+    'desktop/src/main/github-release.ts',
     'desktop/src/main/permissions.ts',
     'desktop/src/preload/index.ts',
     'desktop/src/renderer/App.tsx',
@@ -87,4 +88,23 @@ test('desktop builder is wired for GitHub release publishing', () => {
 
   assert.match(builder, /provider: github/);
   assert.match(builder, /releaseType: release/);
+});
+
+test('desktop exposes trusted GitHub release IPC without hardcoded tokens', () => {
+  const main = fs.readFileSync(path.join('desktop', 'src', 'main', 'main.ts'), 'utf8');
+  const preload = fs.readFileSync(path.join('desktop', 'src', 'preload', 'index.ts'), 'utf8');
+  const release = fs.readFileSync(path.join('desktop', 'src', 'main', 'github-release.ts'), 'utf8');
+  const renderer = fs.readFileSync(path.join('desktop', 'src', 'renderer', 'App.tsx'), 'utf8');
+
+  assert.match(main, /release:getLatest/);
+  assert.match(main, /release:openLatest/);
+  assert.match(main, /shell/);
+  assert.match(preload, /getLatestRelease/);
+  assert.match(preload, /openLatestRelease/);
+  assert.match(release, /api\.github\.com\/repos\/AIMFllyYS\/0-1-CLI\/releases\/latest/);
+  assert.doesNotMatch(release, /GITHUB_PERSONAL_ACCESS_TOKEN\s*=/);
+  assert.doesNotMatch(release, /ghp_[A-Za-z0-9_]+/);
+  assert.match(renderer, /getLatestRelease/);
+  assert.match(renderer, /openLatestRelease/);
+  assert.doesNotMatch(renderer, /href="https:\/\/github\.com\/"/);
 });
