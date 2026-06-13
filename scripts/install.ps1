@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-    Coding CLI 一键安装脚本
+    0-1 CLI 一键安装脚本
 
 .DESCRIPTION
     自动完成 Git、Node.js 检查与安装，clone 仓库，npm install/build，
@@ -22,7 +22,7 @@ if ($Host.Version.Major -le 5) {
 }
 
 $RepoUrl      = "https://github.com/AIMFllyYS/My-Windows-CLI.git"
-$DefaultDir   = "$env:USERPROFILE\coding-cli"
+$DefaultDir   = "$env:USERPROFILE\zero-one-cli"
 $MinNodeMajor = 18
 
 # ──────────────── 工具函数 ────────────────
@@ -87,12 +87,12 @@ function New-StartupShortcut([string]$ExePath, [string]$WorkingDir) {
         New-Item -ItemType Directory -Path $startupDir -Force | Out-Null
     }
     $WshShell = New-Object -ComObject WScript.Shell
-    $Shortcut = $WshShell.CreateShortcut("$startupDir\coding-cli.lnk")
+    $Shortcut = $WshShell.CreateShortcut("$startupDir\hi-cli.lnk")
     $Shortcut.TargetPath = $ExePath
     $Shortcut.WorkingDirectory = $WorkingDir
-    $Shortcut.Description = "Coding CLI"
+    $Shortcut.Description = "0-1 CLI"
     $Shortcut.Save()
-    Write-Success "开机自启动快捷方式已创建: $startupDir\coding-cli.lnk"
+    Write-Success "开机自启动快捷方式已创建: $startupDir\hi-cli.lnk"
 }
 
 # ──────────────── 检测是否已在仓库内 ────────────────
@@ -129,7 +129,7 @@ if (-not $isInRepo -and (Test-Path ".\package.json")) {
 # ──────────────── 欢迎 ────────────────
 
 # 动态读取版本号
-$displayVersion = "0.6.4"
+$displayVersion = "0.6.9"
 if ($isInRepo -and (Test-Path "$repoRoot\package.json")) {
     try {
         $pkgVer = Get-Content "$repoRoot\package.json" -Raw | ConvertFrom-Json
@@ -137,7 +137,7 @@ if ($isInRepo -and (Test-Path "$repoRoot\package.json")) {
     } catch {}
 }
 
-Write-Header "Coding CLI 一键安装脚本"
+Write-Header "0-1 CLI 一键安装脚本"
 Write-Host "版本: v$displayVersion"
 Write-Host "仓库: $RepoUrl"
 Write-Host "`n本脚本将引导你完成以下步骤，每一步都会请求确认:`n"
@@ -153,7 +153,7 @@ if (-not $isInRepo) {
 Write-Host "  $stepNum. npm install   (安装依赖)"; $stepNum++
 Write-Host "  $stepNum. npm run build (编译 TypeScript)"; $stepNum++
 Write-Host "  $stepNum. npm link      (全局注册 coding 命令)"; $stepNum++
-Write-Host "  $stepNum. npm run pkg   (打包为 dist\coding.exe)"; $stepNum++
+Write-Host "  $stepNum. npm run pkg   (打包为 dist\hi.exe)"; $stepNum++
 Write-Host "  $stepNum. 设置开机自启动`n"
 
 if (-not (Confirm-Step "是否开始安装?")) {
@@ -308,12 +308,12 @@ if (Confirm-Step "是否执行 npm run build?") {
 
 Write-Header "步骤 $($script:stepNum): 全局注册 coding 命令 (npm link)"
 $script:stepNum++
-if (Confirm-Step "是否执行 npm link 以全局注册 'coding' 命令?") {
+if (Confirm-Step "是否执行 npm link 以全局注册 'hi' 命令?") {
     npm link
     if ($LASTEXITCODE -ne 0) {
         Write-Fail "npm link 失败 (可能需要管理员权限)。"
     } else {
-        Write-Success "全局命令已注册，可直接使用 'coding'"
+        Write-Success "全局命令已注册，可直接使用 'hi'"
     }
 } else {
     Write-Warn "跳过 npm link。如需全局使用，可稍后手动执行: npm link"
@@ -323,8 +323,8 @@ if (Confirm-Step "是否执行 npm link 以全局注册 'coding' 命令?") {
 
 Write-Header "步骤 $($script:stepNum): 打包为独立 exe (npm run pkg)"
 $script:stepNum++
-$exePath = Join-Path $repoRoot "dist\coding.exe"
-if (Confirm-Step "是否执行 npm run pkg 打包为 dist\coding.exe?") {
+$exePath = Join-Path $repoRoot "dist\hi.exe"
+if (Confirm-Step "是否执行 npm run pkg 打包为 dist\hi.exe?") {
     npm run pkg
     if ($LASTEXITCODE -ne 0) {
         Write-Fail "npm run pkg 失败。"
@@ -374,9 +374,9 @@ if (Test-Command coding) {
 
 Write-Host "`n可用方式:" -ForegroundColor Cyan
 if ($codingAvailable) {
-    Write-Host "  coding --help        查看 CLI 帮助"
-    Write-Host "  coding --chat        启动 AI 对话模式"
-    Write-Host "  coding --paths       扫描项目路径"
+    Write-Host "  hi --help        查看 CLI 帮助"
+    Write-Host "  hi --chat        启动 AI 对话模式"
+    Write-Host "  hi --paths       扫描项目路径"
 }
 if (Test-Path $exePath) {
     Write-Host "  $exePath  直接运行 exe"
@@ -385,4 +385,4 @@ if (Test-Path $exePath) {
 Write-Host "`n配置文件: $repoRoot\.env"
 Write-Host "如需配置 API Key，请复制 .env.example 为 .env 并填写。" -ForegroundColor Yellow
 
-Write-Host "`n感谢安装 Coding CLI!" -ForegroundColor Cyan
+Write-Host "`n感谢安装 0-1 CLI!" -ForegroundColor Cyan

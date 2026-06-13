@@ -44,6 +44,11 @@ irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/in
 irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 -OutFile "$env:TEMP\install-coding-cli.ps1"; & "$env:TEMP\install-coding-cli.ps1"
 ```
 
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.sh | bash
+```
+
 > Administrator privileges may be required for winget to install dependencies. If Chinese characters appear garbled, run `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` first.
 
 ### Manual Installation
