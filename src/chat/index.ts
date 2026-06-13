@@ -34,8 +34,14 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
   const activeSkills = (): ActiveRuntimeSkill[] => runtimeSkills
     .filter((skill) => session.activeSkillIds.includes(skill.id))
     .map((skill) => loadRuntimeSkillContent(skill));
+  const buildSessionPrompt = (): string => getSystemPrompt({
+    mode: session.mode,
+    permissionMode: session.permissionMode,
+    modelId: session.currentModelId,
+    activeSkillNames: activeSkills().map((skill) => skill.name),
+  });
   const syncSkillContext = (): void => upsertSkillContextMessage(messages, formatSkillContextMessage(activeSkills()));
-  const messages: ChatMessage[] = [{ role: 'system', content: getSystemPrompt() }];
+  const messages: ChatMessage[] = [{ role: 'system', content: buildSessionPrompt() }];
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const pendingInput = createPendingInputController();
@@ -141,7 +147,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
       if (handled instanceof Object && 'model' in handled) {
         currentModel = handled.model;
         setCurrentModel(session, currentModel.id);
-        messages[0] = { role: 'system', content: getSystemPrompt() };
+        messages[0] = { role: 'system', content: buildSessionPrompt() };
         syncSkillContext();
       }
       continue;
@@ -232,6 +238,11 @@ async function handleCommand(
   if (modeCommand) {
     setMode(session, modeCommand.mode);
     setSubagentParentPermission(hooks.subagents, session.permissionMode);
+    messages[0] = { role: 'system', content: getSystemPrompt({
+      mode: session.mode,
+      permissionMode: session.permissionMode,
+      modelId: session.currentModelId,
+    }) };
     printSuccess(`已切换到 ${session.mode} 模式`);
     return 'continue';
   }

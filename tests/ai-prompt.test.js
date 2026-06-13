@@ -1,0 +1,78 @@
+const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const test = require('node:test');
+
+execFileSync('cmd.exe', ['/c', 'npm run build --silent'], { stdio: 'pipe' });
+
+test('system prompt is composed from mode tools environment and repo instructions', () => {
+  const { buildSystemPrompt } = require('../dist/chat/prompt');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-prompt-'));
+  fs.writeFileSync(path.join(workspaceRoot, 'AGENTS.md'), '注意禁止弄坏中文\n任务每完成一个阶段进行本地commit\n', 'utf8');
+
+  const prompt = buildSystemPrompt({
+    workspaceRoot,
+    mode: 'agent',
+    permissionMode: 'ask',
+    modelId: 'model-a',
+    toolNames: ['read_file', 'write_file', 'shell'],
+  });
+
+  assert.match(prompt, /# Identity/);
+  assert.match(prompt, /# Mode/);
+  assert.match(prompt, /agent mode/i);
+  assert.match(prompt, /permission mode: ask/i);
+  assert.match(prompt, /read_file/);
+  assert.match(prompt, /write_file/);
+  assert.match(prompt, /shell/);
+  assert.match(prompt, /# Project Instructions/);
+  assert.match(prompt, /注意禁止弄坏中文/);
+  assert.match(prompt, /每完成一个阶段/);
+  assert.match(prompt, /# Environment/);
+  assert.match(prompt, new RegExp(workspaceRoot.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')));
+});
+
+test('mode prompt rules keep chat read-only and plan non-mutating', () => {
+  const { buildModePromptSection } = require('../dist/chat/prompt');
+
+  const chat = buildModePromptSection('chat', 'ask');
+  const plan = buildModePromptSection('plan', 'plan');
+  const agent = buildModePromptSection('agent', 'bypass');
+
+  assert.match(chat, /read-only/i);
+  assert.match(chat, /do not write/i);
+  assert.match(plan, /do not edit/i);
+  assert.match(plan, /plan/i);
+  assert.match(agent, /can edit/i);
+  assert.match(agent, /bypass/i);
+});
+
+test('repo instruction loader preserves UTF-8 and bounds file size', () => {
+  const { loadRepoInstructions } = require('../dist/chat/prompt');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-prompt-repo-'));
+  fs.writeFileSync(path.join(workspaceRoot, 'CLAUDE.md'), '中文说明\n' + 'A'.repeat(20000), 'utf8');
+
+  const instructions = loadRepoInstructions(workspaceRoot, { maxCharsPerFile: 512 });
+
+  assert.equal(instructions.length, 1);
+  assert.equal(instructions[0].file, 'CLAUDE.md');
+  assert.match(instructions[0].content, /中文说明/);
+  assert.ok(instructions[0].content.length < 700);
+  assert.equal(instructions[0].truncated, true);
+});
+
+test('system prompt does not import Claude account telemetry or login behavior', () => {
+  const { buildSystemPrompt } = require('../dist/chat/prompt');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-prompt-safe-'));
+  const prompt = buildSystemPrompt({
+    workspaceRoot,
+    mode: 'chat',
+    permissionMode: 'ask',
+    modelId: 'model-a',
+    toolNames: ['read_file'],
+  });
+
+  assert.doesNotMatch(prompt, /oauth|login|logout|telemetry|analytics|subscription|anthropic account/i);
+});
