@@ -33,13 +33,13 @@ function ask(question: string): Promise<string> {
 
 async function selectTargets(): Promise<SkillTarget[]> {
   const targets = getSkillTargets();
-  console.log(chalk.bold.cyan('\n选择安装目标，可输入序号，用逗号分隔。直接回车安装到 Global。'));
+  console.log(chalk.bold.cyan('\n选择安装目标：可输入序号，用英文逗号分隔。直接回车会安装到 Global。'));
   targets.forEach((target, index) => {
-    const status = target.detected ? 'detected' : 'path will be created';
+    const status = target.detected ? '已存在' : '将自动创建';
     console.log(chalk.gray(`${index + 1}. ${target.displayName} - ${target.path} (${status})`));
   });
 
-  const answer = (await ask('Targets: ')).trim();
+  const answer = (await ask('安装目标: ')).trim();
   if (!answer) return targets.filter((target) => target.key === 'global');
 
   const selected = new Set(answer.split(',').map((part) => Number(part.trim()) - 1));

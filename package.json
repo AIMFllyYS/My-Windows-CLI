@@ -1,6 +1,6 @@
 {
   "name": "coding-cli",
-  "version": "0.6.14",
+  "version": "0.6.15",
   "description": "0-1 CLI - AI CLI onboarding and development toolbox",
   "main": "src/index.ts",
   "bin": {
@@ -16,6 +16,8 @@
     "test:install-registry": "node --test tests/install-registry.test.js",
     "test:skills": "node --test tests/skills-registry.test.js",
     "test:ai-config": "node --test tests/ai-config.test.js",
+    "test:onboarding": "node --test tests/onboarding.test.js",
+    "test:resources": "node --test tests/resources.test.js",
     "link": "npm link",
     "pkg": "pkg dist/index.js --targets node18-win-x64 --output dist/hi.exe"
   },

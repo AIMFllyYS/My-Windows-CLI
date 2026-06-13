@@ -2,7 +2,6 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import * as v8 from 'v8';
@@ -19,19 +18,21 @@ if (process.platform === 'win32') {
 // Load .env from project root (not cwd)
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
-// Import modules
-import { displayAccounts, interactiveSwitch, getGhAuthCommands, getGitHubInfo } from './modules/github';
+import { displayAccounts, interactiveSwitch, getGitHubInfo } from './modules/github';
 import { getProjectPaths, ensureProjectRoot } from './modules/paths';
 import { getCliCommands, getCliByTool } from './modules/cli';
 import { getApps } from './modules/apps';
 import { startChat } from './chat';
 import { runClear } from './modules/clear';
-import { renderHomeHeader } from './modules/home';
 import { handleInstall, parseInstallArgs } from './modules/install';
 import { handleSkills } from './modules/skills';
+import { runStatePage } from './modules/state';
+import { handleGuide } from './modules/guide';
+import { handleApiGuide } from './modules/api';
+import { handlePayGuide } from './modules/pay';
 
 const program = new Command();
-const VERSION = '0.6.14';
+const VERSION = '0.6.15';
 
 program
   .name('hi')
@@ -40,8 +41,11 @@ program
   .allowUnknownOption(true)
   // Basic info options
   .option('-s, --short', 'Short output (key info only)')
+  .option('--state', 'Show GitHub/project/app status page')
   .option('--paths', 'Show project paths only')
   .option('--apps', 'Show app launch commands only')
+  .option('--api', 'Open AI API provider guide')
+  .option('--pay', 'Open payment/card/relay resource guide')
   // GitHub options
   .option('-g, --gh', 'Show GitHub accounts and issues')
   .option('--gh-accounts', 'Show GitHub accounts only')
@@ -60,10 +64,9 @@ program
   // Cleanup options
   .option('--clear', '启用清理模式')
   .option('-p, --process', '清理无用后台进程（需配合 --clear）')
-  .option('-d, --drive', '清理 C 盘硬盘（需配合 --clear）')
-  .option('-a, --all', '同时进行进程和硬盘清理（需配合 --clear）')
-  .option('--clear-a', '快捷方式：同时进行进程和硬盘清理')
-  // Action handler
+  .option('-d, --drive', '清理 C 盘硬盘空间（需配合 --clear）')
+  .option('-a, --all', '同时清理进程和硬盘空间（需配合 --clear）')
+  .option('--clear-a', '快捷方式：同时清理进程和硬盘空间')
   .action(async (opts) => {
     if (opts.install !== undefined) {
       await handleInstall(parseInstallArgs(process.argv.slice(2)));
@@ -71,6 +74,18 @@ program
     }
     if (opts.skills) {
       await handleSkills();
+      return;
+    }
+    if (opts.state) {
+      await runStatePage(opts.task, VERSION);
+      return;
+    }
+    if (opts.api) {
+      await handleApiGuide();
+      return;
+    }
+    if (opts.pay) {
+      await handlePayGuide();
       return;
     }
 
@@ -118,9 +133,7 @@ program
 
     // GitHub full info
     if (opts.gh) {
-      console.log(chalk.bold.cyan('\n╔══════════════════════════════════════════════════════════════╗'));
-      console.log(chalk.bold.cyan('║                    🐙 GitHub Status                         ║'));
-      console.log(chalk.bold.cyan('╚══════════════════════════════════════════════════════════════╝\n'));
+      console.log(chalk.bold.cyan('\n=== GitHub Status ===\n'));
       await getGitHubInfo({ showAccounts: true, showIssues: true });
       return;
     }
@@ -132,11 +145,11 @@ program
         '-kiro': 'kiro', 'kiro': 'kiro',
         '-codex': 'codex', 'codex': 'codex',
         '-gemini': 'gemini', 'gemini': 'gemini',
-        '-cursor': 'cursor', 'cursor': 'cursor'
+        '-cursor': 'cursor', 'cursor': 'cursor',
       };
       const tool = toolMap[opts.cli] || opts.cli;
       if (tool === 'all') {
-        console.log(chalk.bold('\n=== ⚡ CLI Auto Commands ===\n'));
+        console.log(chalk.bold('\n=== CLI Auto Commands ===\n'));
         console.log(getCliCommands(opts.task));
       } else {
         console.log(chalk.bold(`\n=== ${tool.toUpperCase()} CLI ===\n`));
@@ -148,57 +161,19 @@ program
     // Project paths only
     if (opts.paths) {
       const root = await ensureProjectRoot();
-      console.log(chalk.bold('\n📁 Project Paths\n'));
+      console.log(chalk.bold('\nProject Paths\n'));
       console.log(getProjectPaths(root));
       return;
     }
 
     // Apps only
     if (opts.apps) {
-      console.log(chalk.bold('\n🚀 App Launch Commands\n'));
+      console.log(chalk.bold('\nApp Launch Commands\n'));
       console.log(getApps());
       return;
     }
 
-    // Full output
-    console.log(renderHomeHeader(VERSION));
-
-    // 0. Ensure project root is configured
-    const projectRoot = await ensureProjectRoot();
-
-    // 1. GitHub Status
-    console.log(chalk.bold('\n🐙 GitHub Status'));
-    await getGitHubInfo({ showAccounts: true, showIssues: true });
-
-    // 2. Project Paths
-    console.log(chalk.bold('\n📁 Project Paths'));
-    console.log(getProjectPaths(projectRoot));
-
-    // 3. CLI Commands
-    console.log(chalk.bold('\n⚡ CLI Auto Commands'));
-    console.log(getCliCommands(opts.task));
-
-    // 4. App Launch
-    console.log(chalk.bold('\n🚀 App Launch Commands'));
-    console.log(getApps());
-
-    // Help footer
-    console.log(chalk.bold.cyan('\n╔══════════════════════════════════════════════════════════════╗'));
-    console.log(chalk.bold.cyan('║  Usage: hi [options]                                       ║'));
-    console.log(chalk.bold.cyan('╠══════════════════════════════════════════════════════════════╣'));
-    console.log(chalk.bold.cyan('║  --gh          GitHub accounts + issues                       ║'));
-    console.log(chalk.bold.cyan('║  --gh-accounts  GitHub accounts only                        ║'));
-    console.log(chalk.bold.cyan('║  --gh-switch   Interactive account switcher                 ║'));
-    console.log(chalk.bold.cyan('║  --gh-issues   Issues only                                 ║'));
-    console.log(chalk.bold.cyan('║  --paths       Project paths only                          ║'));
-    console.log(chalk.bold.cyan('║  --apps        App launch commands                          ║'));
-    console.log(chalk.bold.cyan('║  --cli <tool>  CLI commands (cc/kiro/codex/gemini/cursor) ║'));
-    console.log(chalk.bold.cyan('║  --chat        AI chat mode                                ║'));
-    console.log(chalk.bold.cyan('║  --clear -p    清理无用后台进程                            ║'));
-    console.log(chalk.bold.cyan('║  --clear -d    清理 C 盘硬盘                               ║'));
-    console.log(chalk.bold.cyan('║  --clear -a    同时进行进程和硬盘清理                      ║'));
-    console.log(chalk.bold.cyan('║  --clear-a     快捷方式：全部清理                          ║'));
-    console.log(chalk.bold.cyan('╚══════════════════════════════════════════════════════════════╝\n'));
+    await handleGuide();
   });
 
 program.parse(process.argv);

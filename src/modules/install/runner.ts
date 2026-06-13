@@ -26,6 +26,9 @@ function openUrl(url: string): void {
 export async function runInstallTarget(target: InstallTarget, latest = false): Promise<void> {
   console.log(chalk.bold.cyan(`\n${target.displayName}`));
   console.log(chalk.gray(target.description));
+  if (target.notes) {
+    console.log(chalk.gray(target.notes));
+  }
   console.log(chalk.gray(`Source: ${target.sourceUrl}`));
 
   if (target.opensUrlOnly) {

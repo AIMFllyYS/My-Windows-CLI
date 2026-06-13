@@ -26,13 +26,13 @@ function installFromLocal(skill: SkillPackage, target: SkillTarget): void {
 
 export async function installSkillToTargets(skill: SkillPackage, targets: SkillTarget[]): Promise<void> {
   for (const target of targets) {
-    console.log(chalk.cyan(`Installing ${skill.displayName} -> ${target.displayName}`));
+    console.log(chalk.cyan(`正在安装 ${skill.displayName} -> ${target.displayName}`));
     fs.mkdirSync(target.path, { recursive: true });
     if (skill.sourceType === 'git') {
       installFromGit(skill, target);
     } else {
       installFromLocal(skill, target);
     }
-    console.log(chalk.green(`Done: ${target.path}`));
+    console.log(chalk.green(`安装完成: ${target.path}`));
   }
 }
