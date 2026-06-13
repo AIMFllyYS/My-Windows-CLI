@@ -102,13 +102,35 @@ test('desktop exposes trusted GitHub release IPC without hardcoded tokens', () =
 
   assert.match(main, /release:getLatest/);
   assert.match(main, /release:openLatest/);
+  assert.match(main, /release:openAsset/);
+  assert.match(main, /releaseAssetUrls/);
   assert.match(main, /shell/);
   assert.match(preload, /getLatestRelease/);
   assert.match(preload, /openLatestRelease/);
+  assert.match(preload, /openReleaseAsset/);
   assert.match(release, /api\.github\.com\/repos\/AIMFllyYS\/0-1-CLI\/releases\/latest/);
   assert.doesNotMatch(release, /GITHUB_PERSONAL_ACCESS_TOKEN\s*=/);
   assert.doesNotMatch(release, /ghp_[A-Za-z0-9_]+/);
   assert.match(renderer, /getLatestRelease/);
   assert.match(renderer, /openLatestRelease/);
+  assert.match(renderer, /openReleaseAsset/);
   assert.doesNotMatch(renderer, /href="https:\/\/github\.com\/"/);
+});
+
+test('desktop release panel renders latest assets as safe buttons', () => {
+  const renderer = fs.readFileSync(path.join('desktop', 'src', 'renderer', 'App.tsx'), 'utf8');
+  const styles = fs.readFileSync(path.join('desktop', 'src', 'renderer', 'styles.css'), 'utf8');
+
+  assert.match(renderer, /releaseInfo/);
+  assert.match(renderer, /release\.assets/);
+  assert.match(renderer, /Download asset/);
+  assert.match(renderer, /browserDownloadUrl/);
+  assert.match(styles, /\.releaseAssets/);
+  assert.match(styles, /\.releaseAsset/);
+});
+
+test('desktop local release output is ignored by git', () => {
+  const ignore = fs.readFileSync('.gitignore', 'utf8');
+
+  assert.match(ignore, /desktop\/release\//);
 });

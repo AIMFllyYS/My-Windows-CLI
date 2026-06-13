@@ -4,7 +4,10 @@ import { killDesktopClearProcesses, scanDesktopClearProcesses } from './clear-ac
 import { runDesktopCli } from './cli-runner';
 import { getLatestRelease, getReleasePageUrl } from './github-release';
 import { listDesktopInstallTargets, runDesktopInstallTarget } from './install-actions';
+import { createReleaseAssetAllowlist, isAllowedReleaseAssetUrl, rememberReleaseAssetUrls } from './release-assets';
 import { installDesktopSkillPackage, listDesktopSkillCatalog } from './skills-actions';
+
+const releaseAssetUrls = createReleaseAssetAllowlist();
 
 function isAllowedRendererUrl(value: string): boolean {
   try {
@@ -52,18 +55,31 @@ app.whenReady().then(() => {
     }
     return { ok: false, output: 'IPC sender is not trusted.' };
   });
-  ipcMain.handle('release:getLatest', (event) => {
+  ipcMain.handle('release:getLatest', async (event) => {
     const senderUrl = event.senderFrame?.url || '';
     if (!isTrustedSender(senderUrl)) {
       return { ok: false, repo: 'AIMFllyYS/0-1-CLI', error: 'IPC sender is not trusted.' };
     }
-    return getLatestRelease();
+    const release = await getLatestRelease();
+    rememberReleaseAssetUrls(releaseAssetUrls, release);
+    return release;
   });
   ipcMain.handle('release:openLatest', async (event) => {
     const senderUrl = event.senderFrame?.url || '';
     const url = getReleasePageUrl();
     if (!isTrustedSender(senderUrl)) {
       return { ok: false, url, error: 'IPC sender is not trusted.' };
+    }
+    await shell.openExternal(url);
+    return { ok: true, url };
+  });
+  ipcMain.handle('release:openAsset', async (event, url: string) => {
+    const senderUrl = event.senderFrame?.url || '';
+    if (!isTrustedSender(senderUrl)) {
+      return { ok: false, url: typeof url === 'string' ? url : '', error: 'IPC sender is not trusted.' };
+    }
+    if (!isAllowedReleaseAssetUrl(releaseAssetUrls, url)) {
+      return { ok: false, url: typeof url === 'string' ? url : '', error: 'Release asset is not from the latest GitHub release.' };
     }
     await shell.openExternal(url);
     return { ok: true, url };

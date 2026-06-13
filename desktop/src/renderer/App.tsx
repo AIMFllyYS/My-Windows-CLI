@@ -36,13 +36,28 @@ type ClearProcess = {
   windowTitle?: string;
   reason: string;
 };
+type ReleaseAsset = {
+  name: string;
+  browserDownloadUrl: string;
+  size: number;
+};
+type ReleaseInfo = {
+  ok: boolean;
+  tagName?: string;
+  name?: string;
+  htmlUrl?: string;
+  publishedAt?: string;
+  assets?: ReleaseAsset[];
+  error?: string;
+};
 
 declare global {
   interface Window {
     zeroOneCli?: {
       runCommand: (command: string) => Promise<{ ok: boolean; output: string }>;
-      getLatestRelease: () => Promise<{ ok: boolean; tagName?: string; name?: string; htmlUrl?: string; publishedAt?: string; assets?: { name: string; browserDownloadUrl: string; size: number }[]; error?: string }>;
+      getLatestRelease: () => Promise<ReleaseInfo>;
       openLatestRelease: () => Promise<{ ok: boolean; url: string; error?: string }>;
+      openReleaseAsset: (url: string) => Promise<{ ok: boolean; url: string; error?: string }>;
       listInstallTargets: () => Promise<InstallTarget[]>;
       runInstallTarget: (request: { key: string; latest?: boolean; confirm?: boolean }) => Promise<{ ok: boolean; output: string; requiresConfirmation?: boolean }>;
       listSkillPackages: () => Promise<{ packages: SkillPackage[]; targets: SkillTarget[] }>;
@@ -64,6 +79,12 @@ const transcript = [
   { role: 'assistant', text: 'Choose a mode, review tools, then run focused CLI actions from the right pane.' },
 ];
 
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return 'size unknown';
+  if (value < 1024 * 1024) return `${Math.ceil(value / 1024)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function App(): React.ReactElement {
   const [mode, setMode] = useState<Mode>('chat');
   const [tab, setTab] = useState<Tab>('tools');
@@ -80,6 +101,7 @@ function App(): React.ReactElement {
   const [selectedClearPids, setSelectedClearPids] = useState<number[]>([]);
   const [output, setOutput] = useState('Ready.');
   const [releaseStatus, setReleaseStatus] = useState('Release status not checked.');
+  const [releaseInfo, setReleaseInfo] = useState<ReleaseInfo | null>(null);
   const modeLabel = useMemo(() => `${mode} / ${mode === 'plan' ? 'plan' : 'ask'}`, [mode]);
 
   async function runCommand(command: string): Promise<void> {
@@ -183,6 +205,7 @@ function App(): React.ReactElement {
       return;
     }
     const release = await window.zeroOneCli.getLatestRelease();
+    setReleaseInfo(release);
     if (!release.ok) {
       setReleaseStatus(release.error || 'Unable to read latest release.');
       return;
@@ -198,6 +221,15 @@ function App(): React.ReactElement {
     }
     const result = await window.zeroOneCli.openLatestRelease();
     setReleaseStatus(result.ok ? `Opened ${result.url}` : (result.error || 'Unable to open release page.'));
+  }
+
+  async function openReleaseAsset(asset: ReleaseAsset): Promise<void> {
+    if (!window.zeroOneCli) {
+      setReleaseStatus('Desktop bridge is unavailable in browser preview.');
+      return;
+    }
+    const result = await window.zeroOneCli.openReleaseAsset(asset.browserDownloadUrl);
+    setReleaseStatus(result.ok ? `Opened ${asset.name}` : (result.error || 'Unable to open release asset.'));
   }
 
   return (
@@ -330,6 +362,26 @@ function App(): React.ReactElement {
               <button onClick={checkLatestRelease}>Check latest release</button>
               <button onClick={openLatestRelease}>Open release page</button>
               <span className="releaseStatus">{releaseStatus}</span>
+              {releaseInfo?.ok && (
+                <div className="releaseAssets">
+                  <div className="releaseMeta">
+                    <strong>{releaseInfo.tagName || releaseInfo.name || 'Latest release'}</strong>
+                    <span>{releaseInfo.publishedAt || 'Published time unavailable'}</span>
+                  </div>
+                  {(releaseInfo.assets || []).length === 0 && (
+                    <p className="emptyState">No downloadable desktop assets on this release.</p>
+                  )}
+                  {(releaseInfo.assets || []).map((asset) => (
+                    <div className="releaseAsset" key={asset.browserDownloadUrl || asset.name}>
+                      <span>
+                        <strong>{asset.name}</strong>
+                        <em>{formatBytes(asset.size)}</em>
+                      </span>
+                      <button onClick={() => void openReleaseAsset(asset)}>Download asset</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>
