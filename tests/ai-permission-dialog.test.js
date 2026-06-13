@@ -19,15 +19,21 @@ function writeCall(id = 'call-write') {
 }
 
 test('permission prompt choice parser supports allow once deny and session allow', () => {
-  const { parsePermissionPromptChoice } = require('../dist/chat/permissions/prompts');
+  const { formatPermissionPromptOptions, parsePermissionPromptChoice } = require('../dist/chat/permissions/prompts');
 
   assert.deepEqual(parsePermissionPromptChoice('1'), { kind: 'allow_once' });
   assert.deepEqual(parsePermissionPromptChoice('allow'), { kind: 'allow_once' });
   assert.deepEqual(parsePermissionPromptChoice('2'), { kind: 'allow_session' });
   assert.deepEqual(parsePermissionPromptChoice('3'), { kind: 'deny' });
+  assert.deepEqual(parsePermissionPromptChoice('4'), { kind: 'deny_feedback' });
+  assert.deepEqual(parsePermissionPromptChoice('feedback'), { kind: 'deny_feedback' });
+  assert.deepEqual(parsePermissionPromptChoice('5'), { kind: 'cancel' });
+  assert.deepEqual(parsePermissionPromptChoice('cancel'), { kind: 'cancel' });
   assert.deepEqual(parsePermissionPromptChoice('session'), { kind: 'allow_session' });
   assert.deepEqual(parsePermissionPromptChoice('no'), { kind: 'deny' });
   assert.deepEqual(parsePermissionPromptChoice('wat'), { kind: 'invalid' });
+  assert.match(formatPermissionPromptOptions(), /4\) Deny with feedback/);
+  assert.match(formatPermissionPromptOptions(), /5\) Cancel/);
 });
 
 test('allow once executes pending tool then resumes the agent turn', async () => {
@@ -124,4 +130,69 @@ test('allow session remembers the tool while deny never executes it', async () =
   assert.equal(session.allowedTools, undefined);
   assert.equal(session.allowedRules[0].toolName, 'write_file');
   assert.ok(session.allowedRules[0].pathPrefix.endsWith('out.txt'));
+});
+
+test('deny with feedback sends tool feedback to the agent and resumes', async () => {
+  const { applyPermissionPromptChoice } = require('../dist/chat/permissions/prompts');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-permission-feedback-'));
+  const messages = [{ role: 'assistant', content: '', tool_calls: [writeCall('feedback-call')] }];
+  let completionCount = 0;
+
+  const resumed = await applyPermissionPromptChoice({
+    choice: { kind: 'deny_feedback', feedback: 'Use a dry-run summary instead.' },
+    pending: {
+      status: 'permission_required',
+      pendingToolCall: writeCall('feedback-call'),
+      permission: { decision: 'ask', reason: 'agent mode requires confirmation' },
+      assistantMessage: messages[0],
+      toolMessage: { role: 'tool', tool_call_id: 'feedback-call', content: 'Permission required' },
+      toolResults: [],
+    },
+    messages,
+    workspaceRoot,
+    mode: 'agent',
+    permissionMode: 'ask',
+    session: {},
+    complete: async (nextMessages) => {
+      completionCount += 1;
+      assert.match(nextMessages.at(-1).content, /Use a dry-run summary instead/);
+      return { role: 'assistant', content: 'I will summarize without writing.' };
+    },
+  });
+
+  assert.equal(resumed.status, 'completed');
+  assert.equal(resumed.finalMessage.content, 'I will summarize without writing.');
+  assert.equal(completionCount, 1);
+  assert.equal(fs.existsSync(path.join(workspaceRoot, 'out.txt')), false);
+});
+
+test('cancel stops the permission request without executing or resuming', async () => {
+  const { applyPermissionPromptChoice } = require('../dist/chat/permissions/prompts');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-permission-cancel-'));
+  let completionCount = 0;
+
+  const cancelled = await applyPermissionPromptChoice({
+    choice: { kind: 'cancel' },
+    pending: {
+      status: 'permission_required',
+      pendingToolCall: writeCall('cancel-call'),
+      permission: { decision: 'ask', reason: 'agent mode requires confirmation' },
+      assistantMessage: { role: 'assistant', content: '', tool_calls: [writeCall('cancel-call')] },
+      toolMessage: { role: 'tool', tool_call_id: 'cancel-call', content: 'Permission required' },
+      toolResults: [],
+    },
+    messages: [{ role: 'assistant', content: '', tool_calls: [writeCall('cancel-call')] }],
+    workspaceRoot,
+    mode: 'agent',
+    permissionMode: 'ask',
+    session: {},
+    complete: async () => {
+      completionCount += 1;
+      return { role: 'assistant', content: 'Should not run.' };
+    },
+  });
+
+  assert.equal(cancelled.status, 'cancelled');
+  assert.equal(completionCount, 0);
+  assert.equal(fs.existsSync(path.join(workspaceRoot, 'out.txt')), false);
 });

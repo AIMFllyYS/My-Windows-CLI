@@ -6,6 +6,8 @@ import { renderPermissionBox } from '../ui/layout';
 export type PermissionPromptChoice =
   | { kind: 'allow_once' }
   | { kind: 'deny' }
+  | { kind: 'deny_feedback'; feedback?: string }
+  | { kind: 'cancel' }
   | { kind: 'allow_session' }
   | { kind: 'invalid' };
 
@@ -14,6 +16,10 @@ export type PermissionPromptResult =
   | {
       status: 'denied';
       toolMessage: { role: 'tool'; tool_call_id?: string; content: string };
+    }
+  | {
+      status: 'cancelled';
+      reason: string;
     };
 
 export function formatPermissionDecision(decision: PermissionDecision, tool = 'tool'): string {
@@ -31,6 +37,12 @@ export function parsePermissionPromptChoice(input: string): PermissionPromptChoi
   if (normalized === '3' || normalized === 'n' || normalized === 'no' || normalized === 'deny') {
     return { kind: 'deny' };
   }
+  if (normalized === '4' || normalized === 'feedback' || normalized === 'deny feedback' || normalized === 'deny with feedback') {
+    return { kind: 'deny_feedback' };
+  }
+  if (normalized === '5' || normalized === 'cancel' || normalized === 'esc') {
+    return { kind: 'cancel' };
+  }
   return { kind: 'invalid' };
 }
 
@@ -39,6 +51,8 @@ export function formatPermissionPromptOptions(): string {
     '  1) Allow once',
     '  2) Allow matching operation for this session',
     '  3) Deny',
+    '  4) Deny with feedback',
+    '  5) Cancel',
   ].join('\n');
 }
 
@@ -85,6 +99,32 @@ export async function applyPermissionPromptChoice(input: {
   maxToolRounds?: number;
 }): Promise<PermissionPromptResult> {
   const toolName = input.pending.pendingToolCall.function.name;
+
+  if (input.choice.kind === 'cancel') {
+    return {
+      status: 'cancelled',
+      reason: `Permission request cancelled for ${toolName}`,
+    };
+  }
+
+  if (input.choice.kind === 'deny_feedback') {
+    const feedback = input.choice.feedback?.trim() || 'No additional feedback provided.';
+    const toolMessage = {
+      role: 'tool' as const,
+      tool_call_id: input.pending.pendingToolCall.id,
+      content: `Tool denied by user: ${toolName}. Feedback: ${feedback}`,
+    };
+    input.messages.push(toolMessage);
+    return runAgentTurn({
+      messages: input.messages,
+      workspaceRoot: input.workspaceRoot,
+      mode: input.mode,
+      permissionMode: input.permissionMode,
+      session: input.session,
+      maxToolRounds: input.maxToolRounds,
+      complete: input.complete,
+    });
+  }
 
   if (input.choice.kind === 'deny' || input.choice.kind === 'invalid') {
     const toolMessage = {

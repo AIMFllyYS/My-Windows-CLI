@@ -760,9 +760,13 @@ async function streamAgentResponse(
 
       let choice = parsePermissionPromptChoice('');
       while (choice.kind === 'invalid') {
-        const answer = await askLine(chalk.cyan('  Choose 1/2/3: '));
+        const answer = await askLine(chalk.cyan('  Choose 1/2/3/4/5: '));
         choice = parsePermissionPromptChoice(answer);
-        if (choice.kind === 'invalid') printWarning('请输入 1、2 或 3。');
+        if (choice.kind === 'invalid') printWarning('请输入 1、2、3、4 或 5。');
+      }
+      if (choice.kind === 'deny_feedback') {
+        const feedback = await askLine(chalk.cyan('  Feedback for the agent: '));
+        choice = { ...choice, feedback };
       }
 
       const next = await applyPermissionPromptChoice({
@@ -784,6 +788,16 @@ async function streamAgentResponse(
           detail: next.toolMessage.content,
         }));
         printWarning('Tool denied by user.');
+        return;
+      }
+      if (next.status === 'cancelled') {
+        console.log(renderTimelineEntry({
+          kind: 'tool',
+          status: 'cancelled',
+          label: result.pendingToolCall.function.name,
+          detail: next.reason,
+        }));
+        printWarning('Tool permission request cancelled.');
         return;
       }
       result = next;
