@@ -13,7 +13,7 @@ const searchAgent = new https.Agent({
  * ZhiPu Web Search API - standalone search tool
  * POST https://open.bigmodel.cn/api/paas/v4/web_search
  */
-export function webSearch(query: string, count: number = 5): Promise<SearchResult[]> {
+export function webSearch(query: string, count: number = 5, signal?: AbortSignal): Promise<SearchResult[]> {
   return new Promise((resolve, reject) => {
     // Read key at call time (after dotenv has loaded)
     const apiKey = process.env.ZHIPU_API_KEY || '';
@@ -27,6 +27,11 @@ export function webSearch(query: string, count: number = 5): Promise<SearchResul
       search_query: query,
       count,
     });
+
+    if (signal?.aborted) {
+      reject(new Error('Search cancelled'));
+      return;
+    }
 
     const req = https.request({
       hostname: 'open.bigmodel.cn',
@@ -61,11 +66,14 @@ export function webSearch(query: string, count: number = 5): Promise<SearchResul
       });
     });
 
+    const onAbort = () => req.destroy(new Error('Search cancelled'));
+    signal?.addEventListener('abort', onAbort, { once: true });
     req.on('error', reject);
     req.setTimeout(30000, () => {
       req.destroy();
       reject(new Error('搜索请求超时 (30s)'));
     });
+    req.on('close', () => signal?.removeEventListener('abort', onAbort));
     req.write(data);
     req.end();
   });

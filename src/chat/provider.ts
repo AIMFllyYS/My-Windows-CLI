@@ -25,6 +25,10 @@ interface StreamCallbacks {
   onReasoning?: (token: string) => void;
 }
 
+export interface StreamHandle {
+  abort: () => void;
+}
+
 interface ProviderSpec {
   name: string;
   protocol?: 'http:' | 'https:';
@@ -95,13 +99,13 @@ export function streamChat(
   model: ModelInfo,
   callbacks: StreamCallbacks,
   tools?: any[]
-): void {
+): StreamHandle {
   const provider = getProviderConfig(model);
 
   if (!provider.key) {
     const name = provider.name === 'custom' ? 'AI_API_KEY' : model.provider === 'zhipu' ? 'ZHIPU_API_KEY' : 'DEEPSEEK_API_KEY';
     callbacks.onError(new Error(`${name} 未配置，请检查 .env 文件`));
-    return;
+    return { abort: () => undefined };
   }
 
   const body: any = {
@@ -213,6 +217,10 @@ export function streamChat(
   });
   req.write(data);
   req.end();
+
+  return {
+    abort: () => req.destroy(new Error('Request cancelled')),
+  };
 }
 
 /**

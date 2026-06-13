@@ -9,6 +9,11 @@ import { Spinner, drawBox, printSuccess, printError, printInfo, printWarning, pr
 import { interactiveSelect } from '../utils/selector';
 import { parseAiEnv, resolveEnvPath, writeAiSettings } from './config';
 import { parseSlashCommand, resolveModelCommand } from './commands';
+import { createInterruptController, createPendingInputController } from './interrupts';
+import { resolveModeCommand } from './modes';
+import { AiSessionState, createSessionState, setCurrentModel, setMode } from './session';
+
+const AI_SESSION_EXIT = '__HI_AI_SESSION_EXIT__';
 
 export interface StartChatOptions {
   modelId?: string;
@@ -17,31 +22,89 @@ export interface StartChatOptions {
 
 export async function startChat(options?: string | StartChatOptions): Promise<void> {
   const startOptions = typeof options === 'string' ? { modelId: options } : (options || {});
-  let currentModel = getModelById(startOptions.modelId || DEFAULT_MODEL_ID) || MODELS[0];
+  const session = createSessionState({ modelId: startOptions.modelId || DEFAULT_MODEL_ID, autoAccept: startOptions.autoAccept });
+  let currentModel = getModelById(session.currentModelId) || MODELS[0];
   const messages: ChatMessage[] = [{ role: 'system', content: getSystemPrompt() }];
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const ask = (): Promise<string> => new Promise(r => rl.question(chalk.cyan('\n  ❯ '), r));
+  const pendingInput = createPendingInputController();
+  const ask = (): Promise<string> => pendingInput.wait((resolve) => rl.question(chalk.cyan('\n  ❯ '), resolve));
+  const askPrompt = async (prompt: string): Promise<string> => {
+    const answer = await pendingInput.wait((resolve) => rl.question(prompt, resolve));
+    if (shouldExit) throw new Error(AI_SESSION_EXIT);
+    return answer;
+  };
+  const interruptController = createInterruptController({ confirmWindowMs: 1200 });
+  let isRunning = false;
+  let shouldExit = false;
+  let activeCancel: (() => void) | null = null;
+  const handleInterrupt = (source: 'Ctrl+C' | 'Esc') => {
+    const result = interruptController.handle({ running: isRunning, inSubmenu: session.inSubmenu });
+    if (result.action === 'back') {
+      return;
+    }
+    if (result.action === 'cancel-running') {
+      activeCancel?.();
+      activeCancel = null;
+      isRunning = false;
+      printWarning('已请求取消当前操作');
+      return;
+    }
+    if (result.action === 'exit') {
+      shouldExit = true;
+      pendingInput.resolveOnExit();
+      return;
+    }
+    printWarning(`再次按 ${source} 退出 AI 会话`);
+  };
+  const onSigint = () => {
+    handleInterrupt('Ctrl+C');
+  };
+  const onKeypress = (_str: string | undefined, key: readline.Key) => {
+    if (key?.ctrl && key.name === 'c') handleInterrupt('Ctrl+C');
+    if (key?.name === 'escape') handleInterrupt('Esc');
+  };
+  const wasRaw = process.stdin.isRaw;
+  readline.emitKeypressEvents(process.stdin, rl);
+  process.stdin.setRawMode?.(true);
+  process.on('SIGINT', onSigint);
+  process.stdin.on('keypress', onKeypress);
+  const runSearch = async (query: string, searchMessages: ChatMessage[], model: ModelInfo): Promise<void> => {
+    const searchAbort = new AbortController();
+    isRunning = true;
+    activeCancel = () => searchAbort.abort();
+    try {
+      await doSearch(query, searchMessages, model, searchAbort.signal, (cancel) => {
+        activeCancel = cancel;
+      });
+    } finally {
+      activeCancel = null;
+      isRunning = false;
+    }
+  };
+  const hooks: RuntimeHooks = { askLine: askPrompt, runSearch };
 
   // Welcome banner
   console.log('\n' + drawBox(
     '🤖 Coding AI Chat',
-    `${startOptions.autoAccept ? 'Auto accept' : '只读安全模式'} · ${currentModel.name}`
+    `${session.mode} / ${session.permissionMode} · ${currentModel.name}`
   ));
   console.log('');
   printInfo('输入问题开始对话，输入 /help 查看命令');
   printDivider();
 
-  while (true) {
+  try {
+  while (!shouldExit) {
     const input = (await ask()).trim();
     if (!input) continue;
 
     // === Slash Commands ===
     if (input.startsWith('/')) {
-      const handled = await handleCommand(input, currentModel, messages, rl);
+      const handled = await handleCommand(input, currentModel, messages, session, hooks);
       if (handled === 'exit') break;
       if (handled instanceof Object && 'model' in handled) {
         currentModel = handled.model;
+        setCurrentModel(session, currentModel.id);
         messages[0] = { role: 'system', content: getSystemPrompt() };
       }
       continue;
@@ -50,7 +113,13 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
     // === Direct Tool Commands ===
     if (isToolCommand(input)) {
       printInfo('执行工具...');
-      const result = await executeTool(input);
+      isRunning = true;
+      let result = '';
+      try {
+        result = await executeTool(input);
+      } finally {
+        isRunning = false;
+      }
       console.log(chalk.gray('\n  ┌── 工具结果 ──'));
       result.split('\n').forEach(l => console.log(chalk.gray('  │ ') + chalk.white(l)));
       console.log(chalk.gray('  └' + '─'.repeat(40)));
@@ -60,16 +129,29 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
     // === Web Search (prefix: search / 搜索) ===
     if (/^(search|搜索)\s+/i.test(input)) {
       const query = input.replace(/^(search|搜索)\s+/i, '');
-      await doSearch(query, messages, currentModel);
+      await runSearch(query, messages, currentModel);
       continue;
     }
 
     // === AI Chat ===
     messages.push({ role: 'user', content: input });
-    await streamAIResponse(messages, currentModel);
+    isRunning = true;
+    try {
+      await streamAIResponse(messages, currentModel, (cancel) => {
+        activeCancel = cancel;
+      });
+    } finally {
+      activeCancel = null;
+      isRunning = false;
+    }
   }
 
+  } finally {
+  process.removeListener('SIGINT', onSigint);
+  process.stdin.removeListener('keypress', onKeypress);
+  if (!wasRaw) process.stdin.setRawMode?.(false);
   rl.close();
+  }
 }
 
 // === Slash Command Handler ===
@@ -78,16 +160,28 @@ interface CommandResult {
   model: ModelInfo;
 }
 
+interface RuntimeHooks {
+  askLine: (prompt: string) => Promise<string>;
+  runSearch: (query: string, messages: ChatMessage[], model: ModelInfo) => Promise<void>;
+}
+
 async function handleCommand(
   input: string,
   currentModel: ModelInfo,
   messages: ChatMessage[],
-  rl: readline.Interface
+  session: AiSessionState,
+  hooks: RuntimeHooks
 ): Promise<'exit' | 'continue' | CommandResult> {
   const parsed = parseSlashCommand(input);
   if (!parsed) return 'continue';
   const cmd = parsed.command;
   const args = parsed.args;
+  const modeCommand = resolveModeCommand(cmd);
+  if (modeCommand) {
+    setMode(session, modeCommand.mode);
+    printSuccess(`已切换到 ${session.mode} 模式`);
+    return 'continue';
+  }
 
   switch (cmd) {
     case '/exit':
@@ -120,11 +214,16 @@ async function handleCommand(
           return { model: selected };
         }
       }
-      return await switchModel(currentModel);
+      return await switchModel(currentModel, session);
 
     case '/setting':
     case '/settings':
-      await configureAiSettings(rl);
+      try {
+        await configureAiSettings(hooks.askLine);
+      } catch (error: any) {
+        if (error?.message === AI_SESSION_EXIT) return 'exit';
+        throw error;
+      }
       return 'continue';
 
     case '/clear':
@@ -138,7 +237,7 @@ async function handleCommand(
       if (!args) {
         printWarning('用法: /search <查询内容>');
       } else {
-        await doSearch(args, messages, currentModel);
+        await hooks.runSearch(args, messages, currentModel);
       }
       return 'continue';
 
@@ -152,18 +251,14 @@ async function handleCommand(
   }
 }
 
-function askLine(rl: readline.Interface, prompt: string): Promise<string> {
-  return new Promise((resolve) => rl.question(prompt, resolve));
-}
-
-async function configureAiSettings(rl: readline.Interface): Promise<void> {
+async function configureAiSettings(askLine: (prompt: string) => Promise<string>): Promise<void> {
   const current = parseAiEnv(process.env);
   console.log('');
   console.log(chalk.bold.cyan('  AI 设置'));
   printDivider();
-  const baseUrl = (await askLine(rl, chalk.cyan(`  URL [${current.baseUrl || 'https://api.example.com/v1'}]: `))).trim() || current.baseUrl;
-  const apiKey = (await askLine(rl, chalk.cyan(`  API Key [${current.apiKey ? '已配置' : '空'}]: `))).trim() || current.apiKey;
-  const modelInput = (await askLine(rl, chalk.cyan(`  Model ID（英文逗号分隔） [${current.modelIds.join(',') || 'model-id'}]: `))).trim();
+  const baseUrl = (await askLine(chalk.cyan(`  URL [${current.baseUrl || 'https://api.example.com/v1'}]: `))).trim() || current.baseUrl;
+  const apiKey = (await askLine(chalk.cyan(`  API Key [${current.apiKey ? '已配置' : '空'}]: `))).trim() || current.apiKey;
+  const modelInput = (await askLine(chalk.cyan(`  Model ID（英文逗号分隔） [${current.modelIds.join(',') || 'model-id'}]: `))).trim();
   const modelIds = (modelInput || current.modelIds.join(','))
     .split(',')
     .map((item) => item.trim())
@@ -213,7 +308,7 @@ function printHelp(): void {
   console.log('');
 }
 
-async function switchModel(current: ModelInfo): Promise<'continue' | CommandResult> {
+async function switchModel(current: ModelInfo, session?: AiSessionState): Promise<'continue' | CommandResult> {
   console.log('');
   console.log(chalk.bold.cyan('  🔄 选择模型'));
   printDivider();
@@ -227,14 +322,19 @@ async function switchModel(current: ModelInfo): Promise<'continue' | CommandResu
 
   let selected: ModelInfo | null = null;
 
-  await interactiveSelect({
-    title: '  选择模型:',
-    options,
-    onSelect: (value) => {
-      selected = getModelById(value) || null;
-    },
-    onCancel: () => { /* do nothing */ },
-  });
+  if (session) session.inSubmenu = true;
+  try {
+    await interactiveSelect({
+      title: '  选择模型:',
+      options,
+      onSelect: (value) => {
+        selected = getModelById(value) || null;
+      },
+      onCancel: () => { /* do nothing */ },
+    });
+  } finally {
+    if (session) session.inSubmenu = false;
+  }
 
   if (selected) {
     if ((selected as ModelInfo).provider === 'custom') {
@@ -257,11 +357,18 @@ function printModelInfo(model: ModelInfo): void {
   console.log('');
 }
 
-async function doSearch(query: string, messages: ChatMessage[], model: ModelInfo): Promise<void> {
+async function doSearch(
+  query: string,
+  messages: ChatMessage[],
+  model: ModelInfo,
+  signal?: AbortSignal,
+  onCancelReady?: (cancel: () => void) => void
+): Promise<void> {
   const spinner = new Spinner('搜索中');
   spinner.start();
   try {
-    const results = await webSearch(query);
+    const results = await webSearch(query, 5, signal);
+    if (signal?.aborted) return;
     spinner.stop();
     console.log(chalk.bold.blue('\n  🔍 搜索结果: ') + chalk.white(query));
     printDivider();
@@ -290,15 +397,21 @@ async function doSearch(query: string, messages: ChatMessage[], model: ModelInfo
     });
 
     // Auto-trigger AI to summarize
-    await streamAIResponse(messages, model);
+    if (signal?.aborted) return;
+    await streamAIResponse(messages, model, onCancelReady);
   } catch (e: any) {
     spinner.stop();
+    if (signal?.aborted || e.message === 'Search cancelled') return;
     printError('搜索失败: ' + e.message);
   }
 }
 
 /** Shared streaming AI response handler */
-async function streamAIResponse(messages: ChatMessage[], model: ModelInfo): Promise<void> {
+async function streamAIResponse(
+  messages: ChatMessage[],
+  model: ModelInfo,
+  onCancelReady?: (cancel: () => void) => void
+): Promise<void> {
   const spinner = new Spinner('AI 思考中');
   spinner.start();
 
@@ -307,7 +420,7 @@ async function streamAIResponse(messages: ChatMessage[], model: ModelInfo): Prom
       let reasoningStarted = false;
       const renderer = new StreamRenderer();
 
-      streamChat(messages, model, {
+      const handle = streamChat(messages, model, {
         onToken: (token) => {
           if (spinner.isRunning()) spinner.stop();
           renderer.push(token);
@@ -335,6 +448,7 @@ async function streamAIResponse(messages: ChatMessage[], model: ModelInfo): Prom
           reject(err);
         },
       });
+      onCancelReady?.(handle.abort);
     });
 
     messages.push({ role: 'assistant', content: response });
