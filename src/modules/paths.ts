@@ -11,6 +11,11 @@ const CACHE_TTL = 30000;
 /**
  * Prompt user to set project root on first run. Returns the configured path.
  */
+export function resolveProjectRootInput(input: string): string | null {
+  const normalized = input.trim().replace(/\\/g, '/').replace(/\/+$/, '');
+  return normalized || null;
+}
+
 export async function ensureProjectRoot(): Promise<string> {
   const existing = getProjectRoot();
   if (existing && fs.existsSync(existing)) return existing;
@@ -18,24 +23,29 @@ export async function ensureProjectRoot(): Promise<string> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = (q: string): Promise<string> => new Promise(r => rl.question(q, r));
 
-  console.log(chalk.bold.yellow('\n⚙️  首次运行配置 / First Run Setup'));
-  console.log(chalk.gray('  请设置存放项目的主文件夹路径'));
-  console.log(chalk.gray('  Please set the root folder that contains your projects\n'));
+  console.log(chalk.bold.yellow('\n\u9996\u6b21\u8fd0\u884c\u914d\u7f6e / First Run Setup'));
+  console.log(chalk.gray('  \u8bf7\u8bbe\u7f6e\u5b58\u653e\u9879\u76ee\u7684\u4e3b\u6587\u4ef6\u5939\u8def\u5f84\uff0c\u76f4\u63a5\u56de\u8f66\u53ef\u8df3\u8fc7'));
+  console.log(chalk.gray('  Set the root folder that contains your projects, or press Enter to skip\n'));
 
   let root = '';
   while (!root) {
-    const input = (await ask(chalk.cyan('  项目主文件夹路径 (e.g. C:/project): '))).trim().replace(/\\/g, '/').replace(/\/+$/, '');
-    if (input && fs.existsSync(input)) {
+    const input = resolveProjectRootInput(await ask(chalk.cyan('  \u9879\u76ee\u4e3b\u6587\u4ef6\u5939\u8def\u5f84 (e.g. C:/project): ')));
+    if (input === null) {
+      console.log(chalk.yellow('\n  \u5df2\u8df3\u8fc7\u9879\u76ee\u76ee\u5f55\u7ed1\u5b9a\uff0c\u53ef\u7a0d\u540e\u91cd\u65b0\u914d\u7f6e\u3002\n'));
+      rl.close();
+      return '';
+    }
+    if (fs.existsSync(input)) {
       root = input;
     } else {
-      console.log(chalk.red('  路径不存在，请重新输入 / Path does not exist'));
+      console.log(chalk.red('  \u8def\u5f84\u4e0d\u5b58\u5728\uff0c\u8bf7\u91cd\u65b0\u8f93\u5165 / Path does not exist'));
     }
   }
 
   const config = loadConfig();
   config.projectRoot = root;
   saveConfig(config);
-  console.log(chalk.green(`\n  ✅ 已保存: ${root}\n`));
+  console.log(chalk.green('\n  \u2713 \u5df2\u4fdd\u5b58 ' + root + '\n'));
   rl.close();
   return root;
 }
@@ -100,7 +110,7 @@ function scanProjects(projectRoot: string): ProjectInfo[] {
 export function getProjectPaths(projectRoot?: string): string {
   const root = projectRoot || getProjectRoot();
   if (!root) {
-    return chalk.yellow('  未配置项目路径，请运行 coding 进行初始化配置');
+    return chalk.yellow('  \u672a\u914d\u7f6e\u9879\u76ee\u8def\u5f84\u3002\u8fd0\u884c hi \u540e\u53ef\u7ed1\u5b9a\uff0c\u4e5f\u53ef\u4ee5\u76f4\u63a5\u56de\u8f66\u8df3\u8fc7\u3002');
   }
 
   const projects = scanProjects(root);

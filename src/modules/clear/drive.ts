@@ -6,11 +6,8 @@ import { exec } from 'child_process';
 import { chatComplete } from '../../chat/provider';
 import { getModelById, DEFAULT_MODEL_ID } from '../../chat/models';
 import { ClearLogger } from './logger';
-
-interface ScanTarget {
-  name: string;
-  path: string;
-}
+import { DRIVE_SYSTEM_PROMPT } from './drive-prompt';
+import { getAggressiveTargets, getConservativeTargets, type ScanTarget } from './drive-targets';
 
 interface ScanResult {
   target: ScanTarget;
@@ -39,38 +36,6 @@ function createReadline(): readline.Interface {
 
 function ask(rl: readline.Interface, q: string): Promise<string> {
   return new Promise((r) => rl.question(q, r));
-}
-
-function getConservativeTargets(): ScanTarget[] {
-  const localAppData = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Local');
-  const sysRoot = process.env.SystemRoot || 'C:\\Windows';
-  const programData = process.env.ProgramData || 'C:\\ProgramData';
-
-  return [
-    { name: 'User temp', path: process.env.TEMP || '' },
-    { name: 'System temp', path: path.join(sysRoot, 'Temp') },
-    { name: 'Windows update cache', path: path.join(sysRoot, 'SoftwareDistribution', 'Download') },
-    { name: 'Windows logs', path: path.join(sysRoot, 'Logs') },
-    { name: 'Windows prefetch', path: path.join(sysRoot, 'Prefetch') },
-    { name: 'Windows error reporting', path: path.join(programData, 'Microsoft', 'Windows', 'WER') },
-    { name: 'Edge cache', path: path.join(localAppData, 'Microsoft', 'Edge', 'User Data', 'Default', 'Cache') },
-    { name: 'Chrome cache', path: path.join(localAppData, 'Google', 'Chrome', 'User Data', 'Default', 'Cache') },
-    { name: 'Windows thumbnail cache', path: path.join(localAppData, 'Microsoft', 'Windows', 'Explorer') },
-  ];
-}
-
-function getAggressiveTargets(): ScanTarget[] {
-  const localAppData = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Local');
-  const sysRoot = process.env.SystemRoot || 'C:\\Windows';
-
-  return [
-    { name: 'DirectX shader cache', path: path.join(localAppData, 'D3DSCache') },
-    { name: 'NVIDIA DX cache', path: path.join(localAppData, 'NVIDIA', 'DXCache') },
-    { name: 'NVIDIA GL cache', path: path.join(localAppData, 'NVIDIA', 'GLCache') },
-    { name: 'System minidumps', path: path.join(sysRoot, 'Minidump') },
-    { name: 'Windows upgrade logs', path: 'C:\\$WINDOWS.~BT\\Sources\\Panther' },
-    { name: 'Delivery Optimization cache', path: path.join('C:\\ProgramData', 'Microsoft', 'Windows', 'DeliveryOptimization', 'Cache') },
-  ];
 }
 
 function scanTarget(target: ScanTarget): ScanResult {
@@ -103,27 +68,6 @@ function scanTarget(target: ScanTarget): ScanResult {
   return { target, fileCount, bytes };
 }
 
-const SYSTEM_PROMPT = `你是 Windows C 盘清理助手。用户会给你当前扫描到的可回收目录列表，请分析哪些是可以安全清理的临时/缓存目录。
-
-特别关注：
-1. 浏览器缓存（Chrome, Edge）
-2. 系统临时文件（Windows Temp, Prefetch）
-3. 更新缓存（SoftwareDistribution\\Download）
-4. 崩溃转储和错误报告
-5. 显卡着色器缓存（NVIDIA, DirectX）
-
-必须排除的（不要推荐删除）：
-- 包含用户文档、照片、视频、代码的目录
-- 系统关键目录（System32, Program Files 等）
-- 任何你不确定是否安全的目录
-
-只返回 JSON，不要其他文字。格式：
-{
-  "recommendations": [
-    {"path": "C:\\\\Users\\\\...\\\\Cache", "name": "Chrome Cache", "sizeMB": 500, "reason": "浏览器缓存，可安全清理", "safeToDelete": true}
-  ]
-}`;
-
 async function aiAnalyzeDrive(results: ScanResult[]): Promise<{ recommendations: DriveRecommendation[]; raw: string }> {
   const model = getModelById(DEFAULT_MODEL_ID);
   if (!model) return { recommendations: [], raw: '' };
@@ -146,7 +90,7 @@ async function aiAnalyzeDrive(results: ScanResult[]): Promise<{ recommendations:
   try {
     const raw = await chatComplete(
       [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: DRIVE_SYSTEM_PROMPT },
         { role: 'user', content: userMsg },
       ],
       model

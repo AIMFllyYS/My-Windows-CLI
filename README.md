@@ -1,288 +1,129 @@
-# My-Windows-CLI
+# 0-1 CLI
 
-<!-- Badges -->
-<div align="center">
+0-1 CLI 是给新人准备的 AI 编程入门工具箱。它把 Claude Code、Codex、Kimi、Kiro、AI IDE、skills、API 平台、支付/虚拟卡、代理环境这些零散步骤收进一个 `hi` 命令里，帮助你从 0 到 1 搭好本地 AI 编程环境。
 
-[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/AIMFllyYS/My-Windows-CLI/blob/master/LICENSE)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
+这个项目的重点不是炫技，而是让第一次接触 CLI 的人也能知道下一步该做什么。
 
-</div>
+## 你可以用它做什么
 
----
+| 命令 | 作用 |
+| --- | --- |
+| `hi` | 默认打开新手讲解模式，从 Claude Code、CLI、代理和 skills 开始入门 |
+| `hi --state` | 打开旧版状态页，查看 GitHub、项目路径、CLI 指令和常用 App |
+| `hi --install` | 进入安装菜单，安装 AI CLI、AI IDE 和魔法环境工具 |
+| `hi --skills` | 打开 skills 市场，安装 Superpowers 或 agent-onboarding-skill |
+| `hi --api` | 选择 GLM、Kimi、DeepSeek、OpenAI、Claude 等 API 平台并跳转 |
+| `hi --pay` | 查看 Supay、代充平台和 API 中转平台入口 |
+| `hi --chat` | 进入内置 AI 对话模式 |
+| `hi --clear` | 清理后台进程或 C 盘空间，执行前会让你确认 |
 
-[English](README.md) | [中文](README_zh-CN.md)
+## 一键安装最新版
 
----
+### Windows PowerShell
 
-> A powerful Windows CLI tool for developers, providing quick access to project paths, GitHub status, AI CLI commands, and interactive AI chat.
+推荐使用 `irm`，编码更稳定：
 
-## ✨ Features
-
-| Feature | Description |
-|---------|-------------|
-| 📁 **Project Paths** - Scan and display all projects in `C:\project` | Auto-scan all projects under `C:\project` |
-| 🐙 **GitHub Status** - View recent issues and auth commands | Check latest Issues and authentication commands |
-| ⚡ **AI CLI Reference** - Commands for Claude, Kiro, Codex, Gemini, Cursor | AI CLI commands reference |
-| 🚀 **App Launcher** - Quick launch commands for common apps | Quick launcher for common applications |
-| 🤖 **AI Chat Mode** - Interactive AI conversation with DeepSeek/GLM | Interactive AI chat with DeepSeek/ZhiPu GLM |
-| 🧹 **Clear** - AI-assisted cleanup of useless processes & C drive | AI-assisted cleanup for background processes and C drive |
-
-## 🚀 Quick Start
-
-### One-Line Install
-
-Run the following command in PowerShell. The script will auto-detect and install Git / Node.js, then clone, build, and optionally register the global command. Each step requires confirmation:
-
-**Recommended (`irm` has more stable encoding):**
 ```powershell
 irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 | iex
 ```
 
-**Alternative (download to local first, most reliable):**
+如果你的终端中文显示异常，先执行：
+
 ```powershell
-irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 -OutFile "$env:TEMP\install-coding-cli.ps1"; & "$env:TEMP\install-coding-cli.ps1"
+[Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 ```
 
-> Administrator privileges may be required for winget to install dependencies. If Chinese characters appear garbled, run `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` first.
+更稳的本地下载方式：
 
-### Manual Installation
+```powershell
+irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 -OutFile "$env:TEMP\install-hi-cli.ps1"; & "$env:TEMP\install-hi-cli.ps1"
+```
 
-#### Prerequisites
-
-- Node.js >= 18.0.0
-- npm >= 9.0.0
-- Git
-
-#### Steps
+### macOS / Linux
 
 ```bash
-# Clone the repository
+curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.sh | bash
+```
+
+## 安装指定版本
+
+如果你想固定安装某个发布版本，把链接里的 `master` 换成对应 tag，例如：
+
+```powershell
+irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/v0.6.15/scripts/install.ps1 | iex
+```
+
+macOS / Linux：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/v0.6.15/scripts/install.sh | bash
+```
+
+如果还没有发布 tag，就继续使用 `master` 安装最新主分支版本。
+
+## 本地开发安装
+
+```bash
 git clone https://github.com/AIMFllyYS/My-Windows-CLI.git
 cd My-Windows-CLI
-
-# Install dependencies
 npm install
-
-# Build TypeScript
 npm run build
-
-# Link globally (optional)
 npm link
-
-# Package to exe (optional)
-npm run pkg
+hi --help
 ```
 
-### First Run
+## 新人推荐路线
+
+1. 先运行 `hi`，看默认讲解模式。
+2. 用 `hi --install cc` 安装 Claude Code。
+3. 用 `hi --install cc-switch` 安装 CC Switch，学习在 Claude Code 中接入其他 API。
+4. 用 `hi --install proxy` 打开 Sibker 代理入口。
+5. 用 `hi --install clash-verge` 下载 Windows 版 Clash Verge。
+6. macOS Intel 用 `hi --install clash-verge-mac-intel`。
+7. macOS Apple Silicon/M 芯片用 `hi --install clash-verge-mac-arm`。
+8. 用 `hi --skills` 安装 `agent-onboarding-skill`，跟着真实任务练习。
+9. 用 `hi --api` 找开发者平台，用 `hi --pay` 找支付和中转入口。
+
+## 常用安装目标
 
 ```bash
-# Copy and configure environment variables
-cp .env.example .env
-# Edit .env and add your API keys
-
-# Run
-coding
+hi --install cc
+hi --install codex
+hi --install kimi
+hi --install cursor
+hi --install cc-switch
+hi --install proxy
+hi --install clash-verge
+hi --install clash-verge-mac-intel
+hi --install clash-verge-mac-arm
+hi --skills
 ```
 
-## 📖 Usage
-
-### Basic Commands
+## 开发命令
 
 ```bash
-# Full output (all info)
-coding
-
-# Short output
-coding --short
-
-# Show only specific sections
-coding --paths      # Project paths only
-coding --apps       # App launch commands only
-coding --issues     # GitHub issues only
+npm install
+npm run build
+npm run test:onboarding
+npm run test:resources
+npm run test:install-registry
+npm run test:skills
 ```
 
-### AI CLI Reference
+## 编码注意事项
 
-```bash
-# Show all AI CLI auto commands
-coding --cli all
-
-# Show specific CLI tool commands
-coding --cli cc      # Claude Code
-coding --cli kiro    # Kiro
-coding --cli codex   # Codex
-coding --cli gemini  # Gemini
-coding --cli cursor  # Cursor
-
-# With task description
-coding --cli cc --task "Fix the login bug"
-```
-
-### AI Chat Mode
-
-```bash
-# Start interactive chat
-coding --chat
-
-# Or use alias
-coding --ai
-
-# Specify model
-coding --chat --model deepseek-chat
-```
-
-### Clear Mode
-
-```bash
-# AI-assisted useless process cleanup
-coding --clear -p
-coding --clear --process
-
-# AI-assisted C drive cleanup
-coding --clear -d
-coding --clear --drive
-
-# Both process + drive cleanup
-coding --clear -a
-coding --clear --all
-
-# Shortcut
-coding --clear-a
-```
-
-> **Clear Features**
-> - 🤖 AI analyzes which processes/files are safe to remove
-> - 🛡️ Local whitelist protects system-critical processes
-> - ✅ User confirmation before any deletion
-> - 📝 Detailed logs saved to `scripts/logs/`
-> - 🧹 C drive: Conservative / Aggressive dual modes
-
-> **AI Chat Features**
-> - 🔒 Read-only mode - Cannot edit/create/delete files
-> - 🛠️ Available tools: `ls`, `dir`, `Read`, `Grep`, `WebSearch`
-> - 🔍 Built-in web search with auto AI summarization
-> - 🧠 Multiple models: DeepSeek V4, GLM-4.7/4.5/5
-> - 💬 Multi-turn conversations
-> - 🌐 Uses DeepSeek / ZhiPu API
-
-## 📋 Supported AI CLI Tools
-
-| Tool | CLI Command | Auto Mode Command |
-|------|-------------|-------------------|
-| **Claude Code** | `claude` | `claude chat --no-interactive --dangerously-skip-permissions "task"` |
-| **Kiro** | `kiro-cli` | `kiro-cli chat --no-interactive --trust-all-tools "task"` |
-| **Codex** | `codex` | `codex --standalone "task"` |
-| **Gemini** | `gemini` | `gemini "task"` |
-| **Cursor** | `cursor` | `cursor --no-install "task"` |
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-Create a `.env` file based on `.env.example`:
-
-```bash
-# DeepSeek API Key (required for AI chat)
-DEEPSEEK_API_KEY=your_api_key_here
-
-# ZhiPu API Key (required for web search and GLM models)
-ZHIPU_API_KEY=your_api_key_here
-
-# GitHub Token (optional, for GitHub features)
-# Can also be read from ~/project/1037Solo/StudySolo-Dev/backend/.env
-```
-
-### Windows Startup
+本项目包含大量中文说明。提交前请确保文件以 UTF-8 保存，PowerShell 输出建议使用 UTF-8：
 
 ```powershell
-# Auto-detect path
-cd scripts
-powershell -ExecutionPolicy Bypass -File create_shortcut.ps1
-
-# Manually specify path
-powershell -ExecutionPolicy Bypass -File create_shortcut.ps1 -ExePath "C:\your\path\dist\coding.exe"
+[Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 ```
 
-## 🛠️ Development
+如果旧终端仍然乱码，可以临时执行：
 
-```bash
-# Build
-npm run build
-
-# Watch mode (development)
-npm run build -- --watch
-
-# Package for distribution
-npm run pkg
-
-# Clean build artifacts
-npm run clean
+```powershell
+chcp 65001
 ```
 
-## 📁 Project Structure
+## License
 
-```
-My-Windows-CLI/
-├── src/
-│   ├── index.ts              # Entry point & command parsing
-│   ├── modules/
-│   │   ├── github/           # GitHub integration
-│   │   │   ├── auth.ts       # Account management & switching
-│   │   │   ├── issues.ts     # Issues fetching
-│   │   │   └── index.ts      # Module exports
-│   │   ├── clear/            # AI-assisted cleanup (process + drive)
-│   │   │   ├── process.ts    # Process cleanup
-│   │   │   ├── drive.ts      # C drive cleanup
-│   │   │   ├── scan.ts       # Process scanning
-│   │   │   ├── ai-filter.ts  # AI judgment
-│   │   │   ├── kill.ts       # Process termination
-│   │   │   ├── logger.ts     # Cleanup logs
-│   │   │   └── index.ts      # Unified entry
-│   │   ├── paths.ts          # Project path scanning
-│   │   ├── cli.ts            # AI CLI commands reference
-│   │   ├── apps.ts           # App launch commands
-│   │   └── chat/             # AI chat (DeepSeek / ZhiPu)
-│   ├── utils/
-│   │   ├── config.ts         # Shared config management
-│   │   └── selector.ts       # Interactive terminal selector
-│   └── types/                # TypeScript type definitions
-├── scripts/
-│   ├── install.ps1           # One-line install script (Windows)
-│   ├── create_shortcut.ps1   # Windows startup shortcut
-│   ├── clean-c-drive.ps1     # C drive cleanup PowerShell script
-│   ├── logs/                 # Cleanup logs (git-ignored)
-│   └── tmp/                  # Temporary files (git-ignored)
-├── package.json
-├── tsconfig.json
-├── .env.example
-└── README.md
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [Anthropic Claude Code](https://docs.anthropic.com/en/docs/claude-code) - AI coding assistant
-- [DeepSeek](https://www.deepseek.com/) - LLM API provider
-- [ZhiPu AI](https://www.zhipu.ai/) - GLM model API provider
-- [pkg](https://github.com/vercel/pkg) - Package Node.js apps
-- 乐事学长 - C drive cleanup PowerShell script source
-
----
-
-<p align="center">
-Made with ❤️ by <a href="https://github.com/AIMFllyYS">AIMFllyYS</a>
-</p>
+MIT

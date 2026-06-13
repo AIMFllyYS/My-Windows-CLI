@@ -1,4 +1,4 @@
-# My-Windows-CLI
+# 0-1 CLI
 
 <!-- 徽章 -->
 <div align="center">
@@ -15,7 +15,7 @@
 
 ---
 
-> 为开发者打造的强大 Windows CLI 工具，可快速获取项目路径、GitHub 状态、AI CLI 命令和交互式 AI 对话。
+> 面向开发者的跨平台 AI CLI 入门工具箱，帮助你从 0 到 1 配置 AI CLI、AI IDE、skills 和自定义 AI Provider。
 
 ## ✨ 功能特点
 
@@ -41,7 +41,20 @@ irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/in
 
 **备选方式（先下载到本地再执行，最可靠）：**
 ```powershell
-irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 -OutFile "$env:TEMP\install-coding-cli.ps1"; & "$env:TEMP\install-coding-cli.ps1"
+irm https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.ps1 -OutFile "$env:TEMP\install-hi-cli.ps1"; & "$env:TEMP\install-hi-cli.ps1"
+```
+
+**macOS / Linux：**
+```bash
+curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/My-Windows-CLI/master/scripts/install.sh | bash
+```
+
+**本地源码安装（clone 后）：**
+```bash
+npm install
+npm run build
+npm link
+hi --help
 ```
 
 > 需要通过 winget 自动安装依赖时可能需要管理员权限。如果中文显示乱码，请先执行 `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`。
@@ -82,7 +95,7 @@ cp .env.example .env
 # 编辑 .env 添加你的 API 密钥
 
 # 运行
-coding
+hi
 ```
 
 ## 📖 使用指南
@@ -91,64 +104,64 @@ coding
 
 ```bash
 # 完整输出（所有信息）
-coding
+hi
 
 # 简短输出
-coding --short
+hi --short
 
 # 仅显示特定部分
-coding --paths      # 仅项目路径
-coding --apps       # 仅应用启动命令
-coding --issues     # 仅 GitHub Issues
+hi --paths      # 仅项目路径
+hi --apps       # 仅应用启动命令
+hi --issues     # 仅 GitHub Issues
 ```
 
 ### AI CLI 参考
 
 ```bash
 # 显示所有 AI CLI 自动运行命令
-coding --cli all
+hi --cli all
 
 # 显示特定 CLI 工具命令
-coding --cli cc      # Claude Code
-coding --cli kiro    # Kiro
-coding --cli codex   # Codex
-coding --cli gemini  # Gemini
-coding --cli cursor  # Cursor
+hi --cli cc      # Claude Code
+hi --cli kiro    # Kiro
+hi --cli codex   # Codex
+hi --cli gemini  # Gemini
+hi --cli cursor  # Cursor
 
 # 带任务描述
-coding --cli cc --task "修复登录 bug"
+hi --cli cc --task "修复登录 bug"
 ```
 
 ### AI 对话模式
 
 ```bash
 # 启动交互式对话
-coding --chat
+hi --chat
 
 # 或使用别名
-coding --ai
+hi --ai
 
 # 指定模型
-coding --chat --model deepseek-chat
+hi --chat --model deepseek-chat
 ```
 
 ### 清理模式
 
 ```bash
 # AI 辅助清理无用后台进程
-coding --clear -p
-coding --clear --process
+hi --clear -p
+hi --clear --process
 
 # AI 辅助 C 盘清理
-coding --clear -d
-coding --clear --drive
+hi --clear -d
+hi --clear --drive
 
 # 同时进行进程和硬盘清理
-coding --clear -a
-coding --clear --all
+hi --clear -a
+hi --clear --all
 
 # 快捷方式
-coding --clear-a
+hi --clear-a
 ```
 
 > **清理特性**
@@ -201,7 +214,7 @@ cd scripts
 powershell -ExecutionPolicy Bypass -File create_shortcut.ps1
 
 # 手动指定路径
-powershell -ExecutionPolicy Bypass -File create_shortcut.ps1 -ExePath "C:\your\path\dist\coding.exe"
+powershell -ExecutionPolicy Bypass -File create_shortcut.ps1 -ExePath "C:\your\path\dist\hi.exe"
 ```
 
 ## 🛠️ 开发
