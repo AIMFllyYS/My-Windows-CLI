@@ -30,3 +30,7 @@ Execute exactly one round handoff file at a time from `rounds/`. A round is not 
 5. The round is committed locally.
 
 Do not push, merge, or publish releases unless the user explicitly asks for that action in the active session.
+
+## Status
+
+Round 0–18 completed locally on branch `codex/ai-cli-claude-port` (2026-06-14). Final audit commit: `chore(ai): complete claude parity v2 audit`.
