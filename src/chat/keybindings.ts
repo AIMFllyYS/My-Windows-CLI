@@ -92,12 +92,35 @@ function keyNameFromReadline(str: string | undefined, key: readline.Key): string
   return key.name || null;
 }
 
+export type OverlayDismissKeyAction =
+  | { action: 'dismiss-overlay' }
+  | { action: 'none' };
+
+export function resolveOverlayDismissKeyAction(
+  str: string | undefined,
+  key: readline.Key,
+  overlayActive: boolean,
+): OverlayDismissKeyAction {
+  if (!overlayActive) return { action: 'none' };
+  const name = keyNameFromReadline(str, key);
+  if (name === 'escape') return { action: 'dismiss-overlay' };
+  if (key.ctrl && name === 'c') return { action: 'dismiss-overlay' };
+  return { action: 'none' };
+}
+
+export function isGlobalInterruptKey(str: string | undefined, key: readline.Key): boolean {
+  const name = keyNameFromReadline(str, key);
+  return (key.ctrl && name === 'c') || name === 'escape';
+}
+
 export function resolveSlashPromptKeyAction(
   str: string | undefined,
   key: readline.Key,
   suggestionsActive: boolean,
 ): SlashPromptKeyAction {
   const name = keyNameFromReadline(str, key);
+  const overlayDismiss = resolveOverlayDismissKeyAction(str, key, suggestionsActive);
+  if (overlayDismiss.action === 'dismiss-overlay') return { action: 'dismiss-suggestions' };
 
   if (suggestionsActive && key.ctrl && name === 'c') return { action: 'dismiss-suggestions' };
   if (suggestionsActive && name === 'escape') return { action: 'dismiss-suggestions' };

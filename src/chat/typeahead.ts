@@ -1,7 +1,7 @@
 import * as readline from 'readline';
 import chalk from 'chalk';
 import { getSlashMenuItems, SlashMenuItem } from './commands';
-import { resolveSlashPromptKeyAction } from './keybindings';
+import { resolveOverlayDismissKeyAction, resolveSlashPromptKeyAction } from './keybindings';
 import { AiMode } from './session';
 import { glyphs } from './terminal-ui';
 import { isPathLikeToken, getPathSuggestions } from './path-completion';
@@ -346,6 +346,14 @@ export function promptWithSlashTypeahead(options: SlashPromptOptions): Promise<s
     };
 
     const onKeypress = (str: string | undefined, key: readline.Key) => {
+      const overlayDismiss = resolveOverlayDismissKeyAction(str, key, state.active);
+      if (overlayDismiss.action === 'dismiss-overlay') {
+        state = dismissSlashTypeahead(state);
+        options.onOverlayChange?.(false);
+        render();
+        return;
+      }
+
       const keyAction = resolveSlashPromptKeyAction(str, key, state.active);
       switch (keyAction.action) {
         case 'dismiss-suggestions':

@@ -43,4 +43,16 @@ test('slash prompt delegates key branching to keybinding resolver', () => {
   const source = fs.readFileSync('src/chat/typeahead.ts', 'utf8');
 
   assert.match(source, /resolveSlashPromptKeyAction/);
+  assert.match(source, /resolveOverlayDismissKeyAction/);
+});
+
+test('overlay dismiss keys close suggestions before global exit confirmation', () => {
+  const { resolveOverlayDismissKeyAction, isGlobalInterruptKey } = require('../dist/chat/keybindings');
+
+  assert.deepEqual(resolveOverlayDismissKeyAction(undefined, { name: 'escape' }, true), { action: 'dismiss-overlay' });
+  assert.deepEqual(resolveOverlayDismissKeyAction(undefined, { name: 'c', ctrl: true }, true), { action: 'dismiss-overlay' });
+  assert.deepEqual(resolveOverlayDismissKeyAction(undefined, { name: 'escape' }, false), { action: 'none' });
+  assert.equal(isGlobalInterruptKey(undefined, { name: 'escape' }), true);
+  assert.equal(isGlobalInterruptKey(undefined, { name: 'c', ctrl: true }), true);
+  assert.equal(isGlobalInterruptKey('x', { name: 'x' }), false);
 });

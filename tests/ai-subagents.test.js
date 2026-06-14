@@ -245,6 +245,23 @@ test('cancelling a queued or running subagent changes status to cancelled', asyn
   assert.equal(queue.items.find((item) => item.id === running.id).status, 'cancelled');
 });
 
+test('cancelled subagent preserves partial summary when available', async () => {
+  const { createSubagentQueue, enqueueSubagent, cancelSubagent, runNextSubagent } = require('../dist/chat/agent/subagents');
+  const queue = createSubagentQueue({ parentPermissionMode: 'ask' });
+  const task = enqueueSubagent(queue, { prompt: 'Review files' });
+  const partial = { summary: 'Read 2 files before stop', notes: ['read_file=note.txt'] };
+  const run = runNextSubagent(queue, async (running) => {
+    cancelSubagent(queue, running.id, { partialResult: partial });
+    return { summary: 'should not complete' };
+  });
+
+  const result = await run;
+
+  assert.equal(result.status, 'cancelled');
+  assert.equal(result.result.summary, 'Read 2 files before stop');
+  assert.deepEqual(result.result.notes, ['read_file=note.txt']);
+});
+
 test('completed subagents are not reported as newly cancelled', () => {
   const { createSubagentQueue, enqueueSubagent, cancelSubagent } = require('../dist/chat/agent/subagents');
   const queue = createSubagentQueue({ parentPermissionMode: 'ask' });

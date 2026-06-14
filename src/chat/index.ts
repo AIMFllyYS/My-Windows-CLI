@@ -9,7 +9,8 @@ import { Spinner, printSuccess, printError, printInfo, printWarning, printDivide
 import { interactiveSelect } from '../utils/selector';
 import { parseAiEnv, resolveEnvPath, writeAiSettings } from './config';
 import { formatSlashMenu, parseSlashCommand, resolveModelCommand } from './commands';
-import { createInterruptController, createPendingInputController } from './interrupts';
+import { createInterruptController, createPendingInputController, formatInterruptedMessage, DEFAULT_EXIT_CONFIRM_WINDOW_MS } from './interrupts';
+import { isGlobalInterruptKey } from './keybindings';
 import { getNextMode, resolveModeCommandAction } from './modes';
 import { AiSessionState, createSessionState, formatCurrentPlan, loadCurrentPlanFromWorkspace, recordCurrentPlan, setCurrentModel, setMode } from './session';
 import { ActiveRuntimeSkill, discoverRuntimeSkills, formatSkillContextMessage, formatSkillList, loadRuntimeSkillContent, resolveSkillSelection, RuntimeSkill, trimMessagesPreservingSkillContext, upsertSkillContextMessage } from './skills';
@@ -73,7 +74,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
     if (shouldExit) throw new Error(AI_SESSION_EXIT);
     return answer;
   };
-  const interruptController = createInterruptController({ confirmWindowMs: 1200 });
+  const interruptController = createInterruptController({ confirmWindowMs: DEFAULT_EXIT_CONFIRM_WINDOW_MS });
   let foregroundBusy = false;
   let shouldExit = false;
   let activeCancel: (() => void) | null = null;
@@ -92,6 +93,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
   const handleInterrupt = (source: 'Ctrl+C' | 'Esc') => {
     const result = interruptController.handle({ running: hasActiveWork(), inSubmenu: session.inSubmenu });
     if (result.action === 'back') {
+      session.inSubmenu = false;
       return;
     }
     if (result.action === 'cancel-running') {
@@ -105,7 +107,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
       } else {
         foregroundBusy = false;
       }
-      printWarning('已请求取消当前操作');
+      printWarning(formatInterruptedMessage());
       return;
     }
     if (result.action === 'exit') {
@@ -125,8 +127,8 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
       cycleMode();
       return;
     }
-    if (key?.ctrl && key.name === 'c') handleInterrupt('Ctrl+C');
-    if (key?.name === 'escape') handleInterrupt('Esc');
+    if (!isGlobalInterruptKey(_str, key || {})) return;
+    handleInterrupt(key?.ctrl && key.name === 'c' ? 'Ctrl+C' : 'Esc');
   };
   const wasRaw = process.stdin.isRaw;
   readline.emitKeypressEvents(process.stdin, rl);
@@ -467,7 +469,12 @@ async function handleAgentCommand(
     try {
       const cancelled = cancelSubagent(hooks.subagents, command.id);
       if (cancelled.status === 'cancelled') {
-        console.log(renderTimelineEntry({ kind: 'subagent', status: 'cancelled', label: cancelled.id, detail: cancelled.prompt }));
+        console.log(renderTimelineEntry({
+          kind: 'subagent',
+          status: 'cancelled',
+          label: cancelled.id,
+          detail: cancelled.result?.summary || cancelled.prompt,
+        }));
       } else {
         console.log(renderTimelineEntry({ kind: 'subagent', status: cancelled.status, label: cancelled.id, detail: cancelled.prompt }));
       }

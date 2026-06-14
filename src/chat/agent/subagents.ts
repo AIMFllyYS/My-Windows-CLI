@@ -52,12 +52,19 @@ export function enqueueSubagent(queue: SubagentQueue, input: SubagentTaskInput):
   return task;
 }
 
-export function cancelSubagent(queue: SubagentQueue, id: string): SubagentTask {
+export function cancelSubagent(
+  queue: SubagentQueue,
+  id: string,
+  options?: { partialResult?: SubagentResult },
+): SubagentTask {
   const task = queue.items.find((item) => item.id === id);
   if (!task) throw new Error(`Unknown subagent: ${id}`);
   if (task.status === 'completed' || task.status === 'failed') return task;
   task.status = 'cancelled';
   task.completedAt = Date.now();
+  if (options?.partialResult) {
+    task.result = normalizeResult(options.partialResult);
+  }
   return task;
 }
 
@@ -74,14 +81,20 @@ export async function runNextSubagent(
   try {
     const result = await handler(task);
     const current = queue.items.find((item) => item.id === task.id) || task;
-    if (current.status === 'cancelled') return current;
+    if (current.status === 'cancelled') {
+      if (current.result) task.result = current.result;
+      return current;
+    }
     task.status = 'completed';
     task.result = normalizeResult(result);
     task.completedAt = Date.now();
     return task;
   } catch (error: any) {
     const current = queue.items.find((item) => item.id === task.id) || task;
-    if (current.status === 'cancelled') return current;
+    if (current.status === 'cancelled') {
+      if (current.result) task.result = current.result;
+      return current;
+    }
     task.status = 'failed';
     task.error = error?.message || String(error);
     task.completedAt = Date.now();
