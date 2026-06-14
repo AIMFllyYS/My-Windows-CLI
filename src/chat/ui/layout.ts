@@ -17,6 +17,15 @@ export interface PermissionBoxInput {
   reason: string;
 }
 
+export interface PlanApprovalPanelInput {
+  plan: string;
+  planFilePath?: string;
+  permissions?: Array<{
+    action: string;
+    reason?: string;
+  }>;
+}
+
 export interface TimelineEntryInput {
   kind: 'tool' | 'subagent' | 'search' | 'model';
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
@@ -66,6 +75,42 @@ export function renderPermissionBox(input: PermissionBoxInput): string {
     `  reason ${ui.muted(truncateVisible(input.reason, 56))}`,
     `  ${ui.success('[允许]')}  ${ui.danger('[拒绝]')}  ${ui.muted('[本次会话记住]')}`,
   ].join('\n');
+}
+
+export function renderPlanApprovalPanel(input: PlanApprovalPanelInput): string {
+  const planLines = input.plan.trim()
+    ? input.plan.trim().split(/\r?\n/)
+    : ['No plan content was provided.'];
+  const output = [
+    '',
+    `  ${ui.accent('Ready to code?')}`,
+    `  ${line(48)}`,
+    `  ${ui.strong("Here is 0-1 CLI's plan:")}`,
+    `  ${ui.muted('-'.repeat(48))}`,
+    ...planLines.map((planLine) => `  ${ui.muted('|')} ${truncateVisible(planLine, 58)}`),
+    `  ${ui.muted('-'.repeat(48))}`,
+  ];
+
+  if (input.planFilePath) {
+    output.push(`  ${ui.muted('Plan file:')} ${truncateVisible(input.planFilePath, 46)}`);
+  }
+
+  const permissions = input.permissions || [];
+  if (permissions.length) {
+    output.push(`  ${ui.strong('Requested permissions:')}`);
+    permissions.forEach((permission) => {
+      const detail = permission.reason ? `${permission.action}: ${permission.reason}` : permission.action;
+      output.push(`  ${ui.muted('-')} ${truncateVisible(detail, 58)}`);
+    });
+  }
+
+  output.push(
+    `  ${ui.muted('0-1 CLI has written up a plan and is ready to execute.')}`,
+    `  ${ui.success('[Y] Yes, manually approve edits')}  ${ui.danger('[N] No, keep planning')}`,
+    `  ${ui.muted(truncateVisible('Tip: edit the plan file first if you want changes before approval.', 62))}`
+  );
+
+  return output.join('\n');
 }
 
 export function renderTimelineEntry(input: TimelineEntryInput): string {

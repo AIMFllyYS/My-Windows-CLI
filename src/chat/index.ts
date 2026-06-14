@@ -18,7 +18,7 @@ import { SubagentQueue } from './agent/types';
 import { RunAgentTurnResult, runAgentTurn } from './agent/loop';
 import { resolveAgentDefinition } from './agent/definitions';
 import { createAiSubagentHandler } from './agent/runner';
-import { renderPermissionBox, renderStatusHeader, renderTimelineEntry } from './ui/layout';
+import { renderPermissionBox, renderPlanApprovalPanel, renderStatusHeader, renderTimelineEntry } from './ui/layout';
 import { SessionPermissionMemory } from './permissions/engine';
 import { applyPermissionPromptChoice, formatPermissionDecision, formatPermissionPromptOptions, parsePermissionPromptChoice } from './permissions/prompts';
 import { buildProviderToolSpecs } from './tools/registry';
@@ -843,23 +843,11 @@ async function handlePlanApprovalResult(input: {
   const { result, messages, session, askLine, hooks } = input;
   const plan = result.plan.trim();
   if (plan) recordCurrentPlan(session, plan, { workspaceRoot: process.cwd() });
-  console.log(renderPermissionBox({
-    tool: result.pendingToolCall.function.name,
-    action: 'ask',
-    reason: 'Approve this plan and switch to agent mode?',
+  console.log(renderPlanApprovalPanel({
+    plan: session.currentPlan || formatCurrentPlan(session),
+    planFilePath: session.currentPlanPath,
+    permissions: result.permissions,
   }));
-  if (session.currentPlanPath) {
-    console.log(chalk.gray(`  Plan file: ${session.currentPlanPath}`));
-  }
-  formatCurrentPlan(session).split('\n').forEach((line) => {
-    console.log(chalk.white('  ' + line));
-  });
-  if (result.permissions.length) {
-    console.log(chalk.gray('  Requested permissions:'));
-    result.permissions.forEach((permission) => {
-      console.log(chalk.gray(`  - ${permission.action}${permission.reason ? `: ${permission.reason}` : ''}`));
-    });
-  }
   const answer = (await askLine(chalk.cyan('  Approve plan and enter agent mode? [y/N]: '))).trim().toLowerCase();
   if (answer === 'y' || answer === 'yes') {
     messages.push({

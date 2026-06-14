@@ -48,6 +48,36 @@ test('permission box renders clear action labels', () => {
   assert.match(output, /ASK/);
 });
 
+test('plan approval panel renders Claude-style ready-to-code review', () => {
+  const { renderPlanApprovalPanel } = require('../dist/chat/ui/layout');
+  const output = stripAnsi(renderPlanApprovalPanel({
+    plan: 'Goal: 保留 UTF-8 中文\nSteps:\n- implement safely',
+    planFilePath: 'D:\\workspace\\.0-1-cli\\plans\\current.md',
+    permissions: [{ action: 'edit files', reason: 'implement plan' }],
+  }));
+
+  assert.match(output, /Ready to code\?/);
+  assert.match(output, /Here is 0-1 CLI's plan:/);
+  assert.match(output, /Goal: 保留 UTF-8 中文/);
+  assert.match(output, /Requested permissions:/);
+  assert.match(output, /edit files: implement plan/);
+  assert.match(output, /Yes, manually approve edits/);
+  assert.match(output, /No, keep planning/);
+  assert.match(output, /Plan file:/);
+});
+
+test('plan approval panel keeps wide plan content within status width', () => {
+  const { renderPlanApprovalPanel } = require('../dist/chat/ui/layout');
+  const raw = renderPlanApprovalPanel({
+    plan: `Goal: ${'保留中文'.repeat(30)}\nSteps:\n- ${'verify '.repeat(40)}`,
+    permissions: [{ action: 'edit files' }],
+  });
+
+  for (const line of raw.split('\n').filter(Boolean)) {
+    assert.ok(visibleLength(line) <= 66, `line too wide: ${stripAnsi(line)}`);
+  }
+});
+
 test('timeline entries render tool and subagent activity', () => {
   const { renderTimelineEntry } = require('../dist/chat/ui/layout');
 
@@ -113,6 +143,7 @@ test('permission box formatter is wired into chat runtime', () => {
   const source = fs.readFileSync('src/chat/index.ts', 'utf8');
 
   assert.match(source, /formatPermissionDecision/);
+  assert.match(source, /renderPlanApprovalPanel/);
   assert.match(source, /subagent runs in/);
 });
 
