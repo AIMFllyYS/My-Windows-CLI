@@ -198,3 +198,76 @@ test('slash command helpers support direct model commands', () => {
   assert.deepEqual(resolveModelCommand('info'), { kind: 'info' });
   assert.deepEqual(resolveModelCommand('alpha'), { kind: 'select', modelId: 'alpha' });
 });
+
+test('maskApiKey hides secrets while keeping edge hints', () => {
+  const { maskApiKey } = require('../dist/chat/config');
+
+  assert.equal(maskApiKey(''), '空');
+  assert.equal(maskApiKey('short'), '*****');
+  assert.match(maskApiKey('sk-test-key-12345678'), /^sk-t\*+5678$/);
+  assert.doesNotMatch(maskApiKey('sk-test-key-12345678'), /test-key/);
+});
+
+test('getSelectableModels exposes comma-separated configured ids only', () => {
+  const { getSelectableModels } = require('../dist/chat/models');
+
+  const models = getSelectableModels({
+    AI_MODELS: 'alpha,beta,custom-one',
+    AI_MODEL: 'beta',
+  });
+
+  assert.deepEqual(models.map((model) => model.id), ['alpha', 'beta', 'custom-one']);
+  assert.equal(models.find((model) => model.id === 'deepseek-v4-flash'), undefined);
+  assert.equal(models.find((model) => model.id === 'custom-one').source, 'custom');
+});
+
+test('getSelectableModels falls back to built-in catalog when unset', () => {
+  const { getSelectableModels, MODELS } = require('../dist/chat/models');
+
+  const models = getSelectableModels({});
+  assert.equal(models.length, MODELS.length);
+  assert.equal(models[0].source, 'builtin');
+});
+
+test('formatModelInfo reports context, tools, multimodal, provider, and source', () => {
+  const { formatModelInfo } = require('../dist/chat/commands');
+  const { resolveModelInfo } = require('../dist/chat/models');
+
+  const builtin = resolveModelInfo('deepseek-v4-flash');
+  const custom = resolveModelInfo('my-model');
+
+  const builtinInfo = formatModelInfo(builtin);
+  assert.match(builtinInfo, /上下文/);
+  assert.match(builtinInfo, /工具调用/);
+  assert.match(builtinInfo, /多模态/);
+  assert.match(builtinInfo, /来源: 内置/);
+  assert.match(builtinInfo, /OpenAI 兼容: 是/);
+
+  const customInfo = formatModelInfo(custom);
+  assert.match(customInfo, /来源: 自定义/);
+  assert.match(customInfo, /工具调用: 支持/);
+});
+
+test('formatModelOptions lists configured model choices', () => {
+  const { formatModelOptions } = require('../dist/chat/commands');
+  const { getSelectableModels } = require('../dist/chat/models');
+
+  const models = getSelectableModels({ AI_MODELS: 'alpha,beta', AI_MODEL: 'beta' });
+  const options = formatModelOptions(models, 'beta');
+
+  assert.deepEqual(options, ['alpha', 'beta (current)']);
+});
+
+test('applyModelSelection rejects unknown configured model ids', () => {
+  const { applyModelSelection } = require('../dist/chat/commands');
+
+  assert.throws(
+    () => applyModelSelection('missing', {
+      baseUrl: 'https://api.example.com/v1',
+      apiKey: 'secret',
+      modelIds: ['alpha', 'beta'],
+      activeModelId: 'alpha',
+    }),
+    /Unknown model/
+  );
+});

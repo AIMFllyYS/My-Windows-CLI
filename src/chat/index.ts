@@ -1,14 +1,14 @@
 import * as readline from 'readline';
 import chalk from 'chalk';
 import { ChatMessage, ModelInfo, ToolCall } from '../types';
-import { MODELS, DEFAULT_MODEL_ID, getAvailableModels, getModelById } from './models';
+import { MODELS, DEFAULT_MODEL_ID, getSelectableModels, getModelById, isConfiguredModelId } from './models';
 import { chatCompleteMessage, streamChat } from './provider';
 import { webSearch } from './search';
 import { executeTool, getSystemPrompt, isToolCommand } from './tools';
 import { Spinner, printSuccess, printError, printInfo, printWarning, printDivider, StreamRenderer } from './renderer';
 import { interactiveSelect } from '../utils/selector';
-import { parseAiEnv, resolveEnvPath, writeAiSettings } from './config';
-import { formatSlashMenu, parseSlashCommand, resolveModelCommand } from './commands';
+import { parseAiEnv, resolveEnvPath, writeAiSettings, maskApiKey, updateActiveModelId } from './config';
+import { formatSlashMenu, parseSlashCommand, resolveModelCommand, formatModelInfo } from './commands';
 import { createInterruptController, createPendingInputController, formatInterruptedMessage, DEFAULT_EXIT_CONFIRM_WINDOW_MS } from './interrupts';
 import { isGlobalInterruptKey } from './keybindings';
 import { getNextMode, preparePlanModeSession, resolveModeCommandAction, resolvePlanApprovalOutcome } from './modes';
@@ -344,11 +344,11 @@ async function handleCommand(
         }
         if (modelCommand.kind === 'select') {
           const selected = getModelById(modelCommand.modelId);
-          if (!selected) {
+          if (!selected || !isConfiguredModelId(modelCommand.modelId)) {
             printWarning('未知模型: ' + modelCommand.modelId);
             return 'continue';
           }
-          if (selected.provider === 'custom') process.env.AI_MODEL = selected.id;
+          persistActiveModel(selected.id);
           printSuccess(`已切换到 ${selected.name}`);
           return { model: selected };
         }
@@ -564,7 +564,8 @@ async function configureAiSettings(askLine: (prompt: string) => Promise<string>)
   console.log(chalk.bold.cyan('  AI 设置'));
   printDivider();
   const baseUrl = (await askLine(chalk.cyan(`  URL [${current.baseUrl || 'https://api.example.com/v1'}]: `))).trim() || current.baseUrl;
-  const apiKey = (await askLine(chalk.cyan(`  API Key [${current.apiKey ? '已配置' : '空'}]: `))).trim() || current.apiKey;
+  const apiKeyHint = current.apiKey ? maskApiKey(current.apiKey) : '空';
+  const apiKey = (await askLine(chalk.cyan(`  API Key [${apiKeyHint}]: `))).trim() || current.apiKey;
   const modelInput = (await askLine(chalk.cyan(`  Model ID（英文逗号分隔） [${current.modelIds.join(',') || 'model-id'}]: `))).trim();
   const modelIds = (modelInput || current.modelIds.join(','))
     .split(',')
@@ -583,6 +584,18 @@ async function configureAiSettings(askLine: (prompt: string) => Promise<string>)
   process.env.AI_MODELS = modelIds.join(',');
   process.env.AI_MODEL = activeModelId;
   printSuccess(`AI 设置已保存，当前模型 ${activeModelId}`);
+  console.log(chalk.gray(`  URL: ${baseUrl}`));
+  console.log(chalk.gray(`  API Key: ${maskApiKey(apiKey)}`));
+  console.log(chalk.gray(`  Models: ${modelIds.join(', ')}`));
+}
+
+function persistActiveModel(modelId: string): void {
+  const settings = parseAiEnv(process.env);
+  process.env.AI_MODEL = modelId;
+  if (settings.modelIds.length === 0) return;
+  if (!settings.modelIds.includes(modelId)) return;
+  const next = updateActiveModelId(resolveEnvPath(), settings, modelId);
+  process.env.AI_MODEL = next.activeModelId;
 }
 
 function printHelp(): void {
@@ -624,7 +637,7 @@ async function switchModel(current: ModelInfo, session?: AiSessionState): Promis
   console.log(chalk.bold.cyan('  🔄 选择模型'));
   printDivider();
 
-  const availableModels = getAvailableModels();
+  const availableModels = getSelectableModels();
   const options = availableModels.map(m => ({
     label: `${m.name}${m.id === current.id ? chalk.green(' (当前)') : ''}`,
     value: m.id,
@@ -648,9 +661,7 @@ async function switchModel(current: ModelInfo, session?: AiSessionState): Promis
   }
 
   if (selected) {
-    if ((selected as ModelInfo).provider === 'custom') {
-      process.env.AI_MODEL = (selected as ModelInfo).id;
-    }
+    persistActiveModel((selected as ModelInfo).id);
     printSuccess(`已切换到 ${(selected as ModelInfo).name}`);
     return { model: selected };
   }
@@ -661,10 +672,14 @@ function printModelInfo(model: ModelInfo): void {
   console.log('');
   console.log(chalk.bold.cyan('  📊 当前模型'));
   printDivider();
-  console.log(chalk.white('  名称: ') + chalk.bold(model.name));
-  console.log(chalk.white('  ID:   ') + chalk.gray(model.id));
-  console.log(chalk.white('  厂商: ') + chalk.yellow(model.provider === 'deepseek' ? 'DeepSeek' : '智谱 GLM'));
-  console.log(chalk.white('  搜索: ') + (model.supportsSearch ? chalk.green('支持') : chalk.gray('不支持')));
+  formatModelInfo(model).split('\n').forEach((line) => {
+    const [label, ...rest] = line.split(': ');
+    if (!rest.length) {
+      console.log(chalk.white('  ' + line));
+      return;
+    }
+    console.log(chalk.white('  ' + label + ': ') + chalk.bold(rest.join(': ')));
+  });
   console.log('');
 }
 

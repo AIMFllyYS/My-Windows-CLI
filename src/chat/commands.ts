@@ -120,6 +120,35 @@ export function formatModelOptions(models: ModelInfo[], activeId: string): strin
   return models.map((model) => `${model.id}${model.id === activeId ? ' (current)' : ''}`);
 }
 
+function formatProviderLabel(provider: ModelInfo['provider']): string {
+  if (provider === 'deepseek') return 'DeepSeek';
+  if (provider === 'zhipu') return '智谱 GLM';
+  return 'Custom (OpenAI-compatible)';
+}
+
+function formatModalities(modalities?: string[]): string {
+  if (!modalities?.length) return '未知';
+  if (modalities.some((item) => /vision|image|multimodal/i.test(item))) {
+    return modalities.includes('text') ? '文本 + 视觉' : '视觉';
+  }
+  return '仅文本';
+}
+
+export function formatModelInfo(model: ModelInfo): string {
+  const lines = [
+    `名称: ${model.name}`,
+    `ID: ${model.id}`,
+    `厂商: ${formatProviderLabel(model.provider)}`,
+    `来源: ${model.source === 'custom' ? '自定义' : '内置'}`,
+    `上下文: ${model.contextLength ? `${model.contextLength.toLocaleString('en-US')} tokens` : '未知'}`,
+    `工具调用: ${model.supportsTools === false ? '不支持' : '支持'}`,
+    `多模态: ${formatModalities(model.modalities)}`,
+    `OpenAI 兼容: ${model.openAiCompatible === false ? '否' : '是'}`,
+  ];
+  if (model.supportsSearch) lines.push('联网搜索: 支持');
+  return lines.join('\n');
+}
+
 export function applyModelSelection(id: string, settings: AiSettings): AiSettings {
   const selected = id.trim();
   if (!settings.modelIds.includes(selected)) {
