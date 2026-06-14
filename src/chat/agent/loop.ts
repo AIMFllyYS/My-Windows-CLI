@@ -11,6 +11,7 @@ export interface RunAgentTurnInput {
   session?: SessionPermissionMemory;
   maxToolRounds?: number;
   complete: (messages: ChatMessage[]) => Promise<ChatMessage> | ChatMessage;
+  handleAgentTool?: (toolCall: ToolCall) => Promise<ChatMessage> | ChatMessage;
 }
 
 export interface AgentToolResult {
@@ -48,6 +49,17 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<RunAgentTu
     }
 
     for (const toolCall of toolCalls) {
+      if (toolCall.function.name === 'task' && input.mode === 'agent' && input.handleAgentTool) {
+        const message = await input.handleAgentTool(toolCall);
+        input.messages.push(message);
+        toolResults.push({
+          toolCall,
+          message,
+          permission: { decision: 'allow', reason: 'agent task delegation' },
+        });
+        continue;
+      }
+
       const result: ExecuteToolCallResult = await executeToolCall({
         toolCall,
         mode: input.mode,

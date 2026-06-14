@@ -60,6 +60,13 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     allowedModes: ['agent'],
     requiresPermission: true,
   },
+  {
+    name: 'task',
+    kind: 'agent',
+    description: 'Launch a scoped local subagent for a specific delegated task',
+    allowedModes: ['agent'],
+    requiresPermission: false,
+  },
 ];
 
 export function getToolDefinition(name: string): ToolDefinition {
@@ -128,6 +135,18 @@ function parametersForTool(name: string): ProviderToolSpec['function']['paramete
         cwd: { type: 'string', description: 'Workspace-relative working directory. Defaults to current directory.' },
       },
       required: ['command'],
+      additionalProperties: false,
+    };
+  }
+  if (name === 'task') {
+    return {
+      type: 'object',
+      properties: {
+        description: { type: 'string', description: 'A short 3-5 word description of the delegated task.' },
+        prompt: { type: 'string', description: 'The complete task prompt for the subagent.' },
+        subagent_type: { type: 'string', description: 'Optional subagent type hint. Defaults to general-purpose.' },
+      },
+      required: ['description', 'prompt'],
       additionalProperties: false,
     };
   }

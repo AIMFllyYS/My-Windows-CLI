@@ -1,7 +1,7 @@
 import { AiMode, PermissionMode } from './session';
 import { buildSystemPrompt } from './prompt';
 import { listFilesTool, readFileTool, searchFilesTool } from './tools/fs-read';
-import { toolForLegacyCommand } from './tools/registry';
+import { buildProviderToolSpecs, toolForLegacyCommand } from './tools/registry';
 
 /**
  * Read-only legacy commands for AI chat.
@@ -44,12 +44,13 @@ export interface SystemPromptOptions {
 }
 
 export function getSystemPrompt(options: SystemPromptOptions = {}): string {
+  const mode = options.mode || 'chat';
   return buildSystemPrompt({
     workspaceRoot: options.workspaceRoot || process.cwd(),
-    mode: options.mode || 'chat',
+    mode,
     permissionMode: options.permissionMode || 'ask',
     modelId: options.modelId || process.env.AI_MODEL || 'default',
-    toolNames: options.toolNames,
+    toolNames: options.toolNames || buildProviderToolSpecs(mode).map((tool) => tool.function.name),
     activeSkillNames: options.activeSkillNames,
   });
 }

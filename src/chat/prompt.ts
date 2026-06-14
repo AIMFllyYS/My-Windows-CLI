@@ -126,12 +126,16 @@ function buildOperatingRulesSection(): string {
 
 function buildToolSection(toolNames: string[] = []): string {
   const names = toolNames.length ? toolNames : ['list_files', 'read_file', 'search_files'];
-  return [
+  const lines = [
     '# Tools',
     'Available tool names:',
     ...names.map((name) => `- ${name}`),
     'Tool execution is governed by the active mode and permission mode.',
-  ].join('\n');
+  ];
+  if (names.includes('task')) {
+    lines.push('Use task to launch a scoped subagent for independent investigation or implementation slices; provide description, prompt, and optional subagent_type.');
+  }
+  return lines.join('\n');
 }
 
 function buildRepoInstructionSection(instructions: RepoInstruction[]): string | null {

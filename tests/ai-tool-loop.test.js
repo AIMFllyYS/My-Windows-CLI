@@ -97,11 +97,16 @@ test('provider tool schemas are generated from the local tool registry', () => {
   assert.ok(names.includes('read_file'));
   assert.ok(names.includes('write_file'));
   assert.ok(names.includes('shell'));
+  assert.ok(names.includes('task'));
   assert.ok(!names.some((name) => /login|telemetry|anthropic/i.test(name)));
 
   const readFile = specs.find((spec) => spec.function.name === 'read_file');
   assert.deepEqual(readFile.function.parameters.required, ['path']);
   assert.equal(readFile.function.parameters.properties.path.type, 'string');
+
+  const task = specs.find((spec) => spec.function.name === 'task');
+  assert.deepEqual(task.function.parameters.required, ['description', 'prompt']);
+  assert.equal(task.function.parameters.properties.subagent_type.type, 'string');
 });
 
 test('provider tool schemas are filtered by active mode before the model sees them', () => {
@@ -112,4 +117,5 @@ test('provider tool schemas are filtered by active mode before the model sees th
   assert.deepEqual(namesFor('plan').sort(), ['list_files', 'read_file', 'search_files']);
   assert.ok(namesFor('agent').includes('write_file'));
   assert.ok(namesFor('agent').includes('shell'));
+  assert.ok(namesFor('agent').includes('task'));
 });

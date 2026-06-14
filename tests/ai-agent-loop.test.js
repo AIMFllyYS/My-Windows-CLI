@@ -73,3 +73,60 @@ test('agent loop stops before executing ask-permission tools', async () => {
   assert.equal(result.pendingToolCall.id, 'call-write');
   assert.equal(fs.existsSync(path.join(workspaceRoot, 'out.txt')), false);
 });
+
+test('agent loop can delegate Claude-style task tool calls to subagent handler', async () => {
+  const { runAgentTurn } = require('../dist/chat/agent/loop');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-agent-loop-task-'));
+  const delegated = [];
+
+  const messages = [
+    { role: 'system', content: 'system' },
+    { role: 'user', content: 'split the review' },
+  ];
+  const result = await runAgentTurn({
+    messages,
+    workspaceRoot,
+    mode: 'agent',
+    permissionMode: 'ask',
+    handleAgentTool: async (toolCall) => {
+      delegated.push(JSON.parse(toolCall.function.arguments));
+      return {
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: 'Subagent sub-1 queued: Review renderer',
+      };
+    },
+    complete: async (nextMessages) => {
+      if (delegated.length === 0) {
+        return {
+          role: 'assistant',
+          content: '',
+          tool_calls: [{
+            id: 'call-task',
+            type: 'function',
+            function: {
+              name: 'task',
+              arguments: JSON.stringify({
+                description: 'Review renderer',
+                prompt: 'Inspect renderer output.',
+                subagent_type: 'general-purpose',
+              }),
+            },
+          }],
+        };
+      }
+      assert.equal(nextMessages.at(-1).role, 'tool');
+      assert.match(nextMessages.at(-1).content, /sub-1 queued/);
+      return { role: 'assistant', content: 'Delegated renderer review.' };
+    },
+  });
+
+  assert.equal(result.status, 'completed');
+  assert.equal(result.finalMessage.content, 'Delegated renderer review.');
+  assert.equal(result.toolResults.length, 1);
+  assert.deepEqual(delegated[0], {
+    description: 'Review renderer',
+    prompt: 'Inspect renderer output.',
+    subagent_type: 'general-purpose',
+  });
+});

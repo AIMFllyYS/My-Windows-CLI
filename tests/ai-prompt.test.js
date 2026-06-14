@@ -71,6 +71,31 @@ test('plan and agent mode prompts include Claude-style operating contracts', () 
   assert.match(agentAsk, /permission engine/i);
 });
 
+test('tool prompt describes Claude-style task delegation without account behavior', () => {
+  const { buildSystemPrompt } = require('../dist/chat/prompt');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-prompt-task-'));
+  const prompt = buildSystemPrompt({
+    workspaceRoot,
+    mode: 'agent',
+    permissionMode: 'ask',
+    modelId: 'model-a',
+    toolNames: ['read_file', 'task'],
+  });
+
+  assert.match(prompt, /task/);
+  assert.match(prompt, /subagent/i);
+  assert.match(prompt, /description/);
+  assert.match(prompt, /prompt/);
+  assert.doesNotMatch(prompt, /oauth|login|logout|telemetry|analytics|subscription|anthropic account/i);
+});
+
+test('chat runtime prompt defaults to provider tools for the active mode', () => {
+  const source = require('node:fs').readFileSync('src/chat/tools.ts', 'utf8');
+
+  assert.match(source, /buildProviderToolSpecs/);
+  assert.match(source, /toolNames:\s*options\.toolNames\s*\|\|/);
+});
+
 test('repo instruction loader preserves UTF-8 and bounds file size', () => {
   const { loadRepoInstructions } = require('../dist/chat/prompt');
   const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-prompt-repo-'));

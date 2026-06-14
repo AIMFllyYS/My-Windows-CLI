@@ -1,6 +1,6 @@
 import * as readline from 'readline';
 import chalk from 'chalk';
-import { ChatMessage, ModelInfo } from '../types';
+import { ChatMessage, ModelInfo, ToolCall } from '../types';
 import { MODELS, DEFAULT_MODEL_ID, getAvailableModels, getModelById } from './models';
 import { chatCompleteMessage, streamChat } from './provider';
 import { webSearch } from './search';
@@ -223,7 +223,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
     foregroundBusy = true;
     try {
       if (session.mode === 'agent') {
-        await streamAgentResponse(messages, currentModel, session, askPrompt, permissionSession);
+        await streamAgentResponse(messages, currentModel, session, askPrompt, permissionSession, hooks);
       } else {
         const response = await streamAIResponse(messages, currentModel, (cancel) => {
           activeCancel = cancel;
@@ -750,12 +750,70 @@ async function streamAIResponse(
   }
 }
 
+function parseTaskToolArguments(toolCall: ToolCall): { description: string; prompt: string; subagentType: string } {
+  try {
+    const parsed = JSON.parse(toolCall.function.arguments || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { description: '', prompt: '', subagentType: 'general-purpose' };
+    }
+    const args = parsed as Record<string, unknown>;
+    return {
+      description: typeof args.description === 'string' ? args.description.trim() : '',
+      prompt: typeof args.prompt === 'string' ? args.prompt.trim() : '',
+      subagentType: typeof args.subagent_type === 'string' && args.subagent_type.trim()
+        ? args.subagent_type.trim()
+        : 'general-purpose',
+    };
+  } catch {
+    return { description: '', prompt: '', subagentType: 'general-purpose' };
+  }
+}
+
+function handleAgentTaskToolCall(
+  toolCall: ToolCall,
+  model: ModelInfo,
+  session: AiSessionState,
+  hooks: RuntimeHooks
+): ChatMessage {
+  const args = parseTaskToolArguments(toolCall);
+  if (!args.prompt) {
+    return {
+      role: 'tool',
+      tool_call_id: toolCall.id,
+      content: 'Error: task prompt is required.',
+    };
+  }
+
+  const task = enqueueSubagent(hooks.subagents, {
+    prompt: args.prompt,
+    mode: 'agent',
+    permissionMode: session.permissionMode,
+    skillIds: session.activeSkillIds,
+    modelId: model.id,
+    currentPlan: session.currentPlan,
+  });
+  console.log(renderTimelineEntry({
+    kind: 'subagent',
+    status: 'queued',
+    label: task.id,
+    detail: args.description || args.prompt,
+  }));
+  runSubagentQueueInBackground(hooks);
+
+  return {
+    role: 'tool',
+    tool_call_id: toolCall.id,
+    content: `Subagent ${task.id} queued: ${args.description || args.prompt}\nsubagent_type=${args.subagentType}`,
+  };
+}
+
 async function streamAgentResponse(
   messages: ChatMessage[],
   model: ModelInfo,
   session: AiSessionState,
   askLine: (prompt: string) => Promise<string>,
-  permissionSession: SessionPermissionMemory
+  permissionSession: SessionPermissionMemory,
+  hooks: RuntimeHooks
 ): Promise<void> {
   const spinner = new Spinner('Agent 思考中');
   spinner.start();
@@ -768,6 +826,7 @@ async function streamAgentResponse(
       mode: session.mode,
       permissionMode: session.permissionMode,
       session: permissionSession,
+      handleAgentTool: (toolCall) => handleAgentTaskToolCall(toolCall, model, session, hooks),
       complete: (nextMessages) => chatCompleteMessage(nextMessages, model, buildProviderToolSpecs(session.mode)),
     });
 
@@ -803,6 +862,7 @@ async function streamAgentResponse(
         mode: session.mode,
         permissionMode: session.permissionMode,
         session: permissionSession,
+        handleAgentTool: (toolCall) => handleAgentTaskToolCall(toolCall, model, session, hooks),
         complete: (nextMessages) => chatCompleteMessage(nextMessages, model, buildProviderToolSpecs(session.mode)),
       });
 

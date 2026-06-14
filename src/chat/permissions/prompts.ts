@@ -96,6 +96,7 @@ export async function applyPermissionPromptChoice(input: {
   permissionMode: RunAgentTurnInput['permissionMode'];
   session?: SessionPermissionMemory;
   complete: RunAgentTurnInput['complete'];
+  handleAgentTool?: RunAgentTurnInput['handleAgentTool'];
   maxToolRounds?: number;
 }): Promise<PermissionPromptResult> {
   const toolName = input.pending.pendingToolCall.function.name;
@@ -123,6 +124,7 @@ export async function applyPermissionPromptChoice(input: {
       session: input.session,
       maxToolRounds: input.maxToolRounds,
       complete: input.complete,
+      handleAgentTool: input.handleAgentTool,
     });
   }
 
@@ -164,5 +166,6 @@ export async function applyPermissionPromptChoice(input: {
     session,
     maxToolRounds: input.maxToolRounds,
     complete: input.complete,
+    handleAgentTool: input.handleAgentTool,
   });
 }
