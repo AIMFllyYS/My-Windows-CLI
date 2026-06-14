@@ -48,6 +48,34 @@ test('subagents inherit parent plan skills model and tool limits into default re
   assert.match(notes, /allowedTools=read_file,search_files/);
 });
 
+test('subagent message builder scopes task context without account telemetry behavior', () => {
+  const { buildSubagentMessages } = require('../dist/chat/agent/prompt');
+
+  const messages = buildSubagentMessages({
+    prompt: 'Review release workflow',
+    mode: 'agent',
+    permissionMode: 'ask',
+    allowedTools: ['read_file', 'search_files'],
+    skillIds: ['frontend-design'],
+    modelId: 'model-a',
+    currentPlan: 'Goal: ship desktop assets',
+  });
+
+  assert.equal(messages.length, 2);
+  assert.equal(messages[0].role, 'system');
+  assert.equal(messages[1].role, 'user');
+  assert.match(messages[0].content, /Subagent Runtime/);
+  assert.match(messages[0].content, /mode=agent/);
+  assert.match(messages[0].content, /permissionMode=ask/);
+  assert.match(messages[0].content, /allowedTools=read_file,search_files/);
+  assert.match(messages[0].content, /skillIds=frontend-design/);
+  assert.match(messages[0].content, /modelId=model-a/);
+  assert.match(messages[0].content, /Current Plan/);
+  assert.match(messages[0].content, /Goal: ship desktop assets/);
+  assert.match(messages[1].content, /Review release workflow/);
+  assert.doesNotMatch(messages.map((message) => message.content).join('\n'), /login|logout|oauth|telemetry|analytics|anthropic account/i);
+});
+
 test('subagent permissions can narrow but not widen parent permissions', () => {
   const { createSubagentQueue, enqueueSubagent } = require('../dist/chat/agent/subagents');
 
