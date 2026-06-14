@@ -151,3 +151,48 @@ test('desktop preload rejects non-whitelisted runCommand requests', () => {
   assert.match(preload, /validateDesktopCommand/);
   assert.match(permissions, /export function validateDesktopCommand/);
 });
+
+test('desktop ai bridge uses dedicated ipc and does not expose raw shell', () => {
+  const main = read('desktop/src/main/main.ts');
+  const runner = read('desktop/src/main/cli-runner.ts');
+  const preload = read('desktop/src/preload/index.ts');
+
+  assert.match(main, /ai:launch/);
+  assert.match(runner, /launchDesktopAiSession/);
+  assert.match(preload, /launchAiSession/);
+  assert.match(runner, /--ai/);
+  assert.doesNotMatch(runner, /launchDesktopAiSession[\s\S]*shell:\s*true/);
+  assert.doesNotMatch(preload, /runCommand\([^)]*['"]ai['"]/);
+});
+
+test('desktop renderer separates ai bridge from dashboard commands', () => {
+  const renderer = read('desktop/src/renderer/App.tsx');
+
+  assert.match(renderer, /launchAiSession/);
+  assert.doesNotMatch(renderer, /runCommand\(['"]hi --ai['"]\)/);
+  assert.doesNotMatch(renderer, /runCommand\(['"]ai['"]\)/);
+  assert.match(renderer, /outputPanel/);
+});
+
+test('desktop renderer mirrors cli modes and balanced shell layout', () => {
+  const renderer = read('desktop/src/renderer/App.tsx');
+  const styles = read('desktop/src/renderer/styles.css');
+
+  assert.match(renderer, /read-only/);
+  assert.match(renderer, /asks before tools/);
+  assert.match(renderer, /no edits/);
+  assert.match(renderer, /modeSwitch/);
+  assert.match(styles, /\.shell\s*\{/);
+  assert.match(styles, /\.sidebar\s*\{/);
+  assert.match(styles, /\.conversation\s*\{/);
+  assert.match(styles, /\.inspector\s*\{/);
+  assert.match(styles, /\.composer\s*\{/);
+});
+
+test('desktop settings panel explains cli setting flow', () => {
+  const renderer = read('desktop/src/renderer/App.tsx');
+
+  assert.match(renderer, /\/setting/);
+  assert.match(renderer, /SettingsPanel/);
+  assert.match(renderer, /launchAiSession|Open AI terminal/i);
+});

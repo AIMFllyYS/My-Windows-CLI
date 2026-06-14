@@ -55,6 +55,7 @@ declare global {
   interface Window {
     zeroOneCli?: {
       runCommand: (command: string) => Promise<{ ok: boolean; output: string }>;
+      launchAiSession: (request?: { mode?: 'chat' | 'agent' | 'plan' }) => Promise<{ ok: boolean; output: string }>;
       getLatestRelease: () => Promise<ReleaseInfo>;
       openLatestRelease: () => Promise<{ ok: boolean; url: string; error?: string }>;
       openReleaseAsset: (url: string) => Promise<{ ok: boolean; url: string; error?: string }>;
@@ -74,9 +75,15 @@ const sessions = [
   { id: 'release', name: 'Desktop Release', status: 'queued' },
 ];
 
+const MODE_META: Record<Mode, { title: string; hint: string; prompt: string }> = {
+  chat: { title: 'Chat Mode', hint: 'read-only', prompt: '/chat' },
+  agent: { title: 'Agent Mode', hint: 'asks before tools', prompt: '/agent' },
+  plan: { title: 'Plan Mode', hint: 'no edits', prompt: '/plan' },
+};
+
 const transcript = [
   { role: 'system', text: '0-1 CLI Desktop mirrors the AI runtime: chat, agent, plan, settings, models, skills, and local subagents.' },
-  { role: 'assistant', text: 'Choose a mode, review tools, then run focused CLI actions from the right pane.' },
+  { role: 'assistant', text: 'Choose a mode, open the AI terminal bridge, and run dashboard commands from the inspector tools panel.' },
 ];
 
 function formatBytes(value: number): string {
@@ -104,7 +111,28 @@ function App(): React.ReactElement {
   const [commandBusy, setCommandBusy] = useState(false);
   const [releaseStatus, setReleaseStatus] = useState('Release status not checked.');
   const [releaseInfo, setReleaseInfo] = useState<ReleaseInfo | null>(null);
-  const modeLabel = useMemo(() => `${mode} / ${mode === 'plan' ? 'plan' : 'ask'}`, [mode]);
+  const [aiBridgeBusy, setAiBridgeBusy] = useState(false);
+  const modeMeta = MODE_META[mode];
+  const modeLabel = useMemo(() => `${modeMeta.title} · ${modeMeta.hint}`, [modeMeta]);
+
+  async function launchAiSession(): Promise<void> {
+    if (aiBridgeBusy || commandBusy) {
+      setOutput('Another desktop action is still running. Wait for it to finish.');
+      return;
+    }
+    if (!window.zeroOneCli) {
+      setOutput('Desktop bridge is unavailable in browser preview.');
+      return;
+    }
+    setAiBridgeBusy(true);
+    setCopyStatus('');
+    try {
+      const result = await window.zeroOneCli.launchAiSession({ mode });
+      setOutput(result.output || (result.ok ? 'AI session opened in terminal.' : 'Unable to open AI session.'));
+    } finally {
+      setAiBridgeBusy(false);
+    }
+  }
 
   async function runCommand(command: string): Promise<void> {
     if (commandBusy) {
@@ -270,12 +298,16 @@ function App(): React.ReactElement {
         </div>
         <section className="sessionList">
           {sessions.map((session) => (
-            <button className="session" key={session.id}>
+            <button className="session" key={session.id} type="button">
               <span>{session.name}</span>
               <em>{session.status}</em>
             </button>
           ))}
         </section>
+        <footer className="railFooter">
+          <p>Workspace shell</p>
+          <span>Dashboard commands stay in the inspector. AI runs in a separate terminal bridge.</span>
+        </footer>
       </aside>
 
       <section className="conversation">
@@ -284,14 +316,22 @@ function App(): React.ReactElement {
             <p>Workspace</p>
             <h1>My-CLI AI Runtime</h1>
           </div>
-          <div className="modeSwitch" aria-label="Mode">
-            {(['chat', 'agent', 'plan'] as Mode[]).map((item) => (
-              <button key={item} className={mode === item ? 'selected' : ''} onClick={() => setMode(item)}>
-                {item}
-              </button>
-            ))}
+          <div className="modeSwitchWrap">
+            <div className="modeSwitch" aria-label="Mode">
+              {(['chat', 'agent', 'plan'] as Mode[]).map((item) => (
+                <button key={item} type="button" className={mode === item ? 'selected' : ''} onClick={() => setMode(item)}>
+                  {item}
+                </button>
+              ))}
+            </div>
+            <p className="modeHint">{MODE_META[mode].hint}</p>
           </div>
         </header>
+
+        <div className="conversationStatus">
+          <span className="modeBadge">{modeMeta.prompt}</span>
+          <span>{modeLabel}</span>
+        </div>
 
         <div className="thread">
           {transcript.map((item, index) => (
@@ -302,15 +342,19 @@ function App(): React.ReactElement {
           ))}
           <article className="bubble assistant highlight">
             <span>status</span>
-            <p>Mode {modeLabel}. Skills context and subagent queue are available from the CLI-backed panels.</p>
+            <p>{modeLabel}. Use the composer to open an isolated AI terminal session, or run whitelisted dashboard commands from Tools.</p>
           </article>
         </div>
 
         <footer className="composer">
-          <input value={`/${mode}`} readOnly aria-label="Prompt" />
-          <button disabled={commandBusy} onClick={() => runCommand('help')}>
-            {commandBusy ? 'Running…' : 'Run'}
+          <div className="composerField">
+            <span className="composerPrefix">{modeMeta.prompt}</span>
+            <input value="Open the terminal bridge to chat with My-CLI AI" readOnly aria-label="Prompt" />
+          </div>
+          <button type="button" disabled={aiBridgeBusy || commandBusy} onClick={() => void launchAiSession()}>
+            {aiBridgeBusy ? 'Opening…' : 'Open AI terminal'}
           </button>
+          <p className="composerHint">Interactive AI stays outside dashboard IPC. Configure models with /setting inside the terminal session.</p>
         </footer>
       </section>
 
@@ -390,38 +434,23 @@ function App(): React.ReactElement {
           {tab === 'diff' && <p>Diff review is prepared for file-change summaries from future agent runs.</p>}
           {tab === 'preview' && <p>Preview panes can host local app/browser output in a later integration.</p>}
           {tab === 'settings' && (
-            <div className="stack">
-              <p>Use /setting in AI mode to configure URL, API key, and model IDs.</p>
-              <button onClick={checkLatestRelease}>Check latest release</button>
-              <button onClick={openLatestRelease}>Open release page</button>
-              <span className="releaseStatus">{releaseStatus}</span>
-              {releaseInfo?.ok && (
-                <div className="releaseAssets">
-                  <div className="releaseMeta">
-                    <strong>{releaseInfo.tagName || releaseInfo.name || 'Latest release'}</strong>
-                    <span>{releaseInfo.publishedAt || 'Published time unavailable'}</span>
-                  </div>
-                  {(releaseInfo.assets || []).length === 0 && (
-                    <p className="emptyState">No downloadable desktop assets on this release.</p>
-                  )}
-                  {(releaseInfo.assets || []).map((asset) => (
-                    <div className="releaseAsset" key={asset.browserDownloadUrl || asset.name}>
-                      <span>
-                        <strong>{asset.name}</strong>
-                        <em>{formatBytes(asset.size)}</em>
-                      </span>
-                      <button onClick={() => void openReleaseAsset(asset)}>Download asset</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SettingsPanel
+              releaseStatus={releaseStatus}
+              releaseInfo={releaseInfo}
+              aiBridgeBusy={aiBridgeBusy}
+              commandBusy={commandBusy}
+              mode={mode}
+              onLaunchAi={() => void launchAiSession()}
+              onCheckRelease={() => void checkLatestRelease()}
+              onOpenRelease={() => void openLatestRelease()}
+              onOpenAsset={(asset) => void openReleaseAsset(asset)}
+            />
           )}
         </section>
 
         <div className="outputPanel">
           <div className="outputHeader">
-            <span>{commandBusy ? 'Running command…' : 'Command output'}</span>
+            <span>{commandBusy ? 'Running dashboard command…' : 'Dashboard output'}</span>
             <div className="outputActions">
               {copyStatus && <em className="copyStatus">{copyStatus}</em>}
               <button type="button" disabled={!output || commandBusy} onClick={() => void copyOutput()}>
@@ -524,6 +553,65 @@ function SkillsPanel(props: {
         <button disabled={!selected || props.selectedTargetKeys.length === 0} onClick={() => void props.onInstall()}>
           Confirm install
         </button>
+      </div>
+    </div>
+  );
+}
+
+function SettingsPanel(props: {
+  releaseStatus: string;
+  releaseInfo: ReleaseInfo | null;
+  aiBridgeBusy: boolean;
+  commandBusy: boolean;
+  mode: Mode;
+  onLaunchAi: () => void;
+  onCheckRelease: () => void;
+  onOpenRelease: () => void;
+  onOpenAsset: (asset: ReleaseAsset) => void;
+}): React.ReactElement {
+  return (
+    <div className="settingsPanel">
+      <div className="panelHeader">
+        <div>
+          <p>provider settings</p>
+          <h2>CLI configuration</h2>
+        </div>
+      </div>
+      <div className="settingsCopy">
+        <p>Use <code>/setting</code> inside the AI terminal to persist base URL, API key, model IDs, and the active model.</p>
+        <p>Desktop does not collect secrets over IPC. Open the terminal bridge, run <code>/setting</code>, and follow the masked prompts there.</p>
+      </div>
+      <div className="settingsActions">
+        <button type="button" disabled={props.aiBridgeBusy || props.commandBusy} onClick={props.onLaunchAi}>
+          Open AI terminal
+        </button>
+        <span>Selected mode: {props.mode} · {MODE_META[props.mode].hint}</span>
+      </div>
+      <div className="settingsSection">
+        <h3>Release assets</h3>
+        <button type="button" onClick={props.onCheckRelease}>Check latest release</button>
+        <button type="button" onClick={props.onOpenRelease}>Open release page</button>
+        <span className="releaseStatus">{props.releaseStatus}</span>
+        {props.releaseInfo?.ok && (
+          <div className="releaseAssets">
+            <div className="releaseMeta">
+              <strong>{props.releaseInfo.tagName || props.releaseInfo.name || 'Latest release'}</strong>
+              <span>{props.releaseInfo.publishedAt || 'Published time unavailable'}</span>
+            </div>
+            {(props.releaseInfo.assets || []).length === 0 && (
+              <p className="emptyState">No downloadable desktop assets on this release.</p>
+            )}
+            {(props.releaseInfo.assets || []).map((asset) => (
+              <div className="releaseAsset" key={asset.browserDownloadUrl || asset.name}>
+                <span>
+                  <strong>{asset.name}</strong>
+                  <em>{formatBytes(asset.size)}</em>
+                </span>
+                <button type="button" onClick={() => props.onOpenAsset(asset)}>Download asset</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

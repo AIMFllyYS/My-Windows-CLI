@@ -147,3 +147,16 @@ test('desktop local release output is ignored by git', () => {
 
   assert.match(ignore, /desktop\/release\//);
 });
+
+test('desktop ai bridge ipc is isolated from cli run channel', () => {
+  const main = fs.readFileSync(path.join('desktop', 'src', 'main', 'main.ts'), 'utf8');
+  const runner = fs.readFileSync(path.join('desktop', 'src', 'main', 'cli-runner.ts'), 'utf8');
+  const preload = fs.readFileSync(path.join('desktop', 'src', 'preload', 'index.ts'), 'utf8');
+
+  assert.match(main, /ipcMain\.handle\('ai:launch'/);
+  assert.match(main, /ipcMain\.handle\('cli:run'/);
+  assert.match(runner, /export function launchDesktopAiSession/);
+  assert.match(runner, /export function runDesktopCli/);
+  assert.match(preload, /launchAiSession/);
+  assert.doesNotMatch(preload, /launchAiSession[\s\S]*validateDesktopCommand/);
+});

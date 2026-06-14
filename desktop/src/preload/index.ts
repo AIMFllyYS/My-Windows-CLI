@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('zeroOneCli', {
     }
     return ipcRenderer.invoke('cli:run', command);
   },
+  launchAiSession: (request?: { mode?: 'chat' | 'agent' | 'plan' }) => ipcRenderer.invoke('ai:launch', request || {}),
   getLatestRelease: () => ipcRenderer.invoke('release:getLatest'),
   openLatestRelease: () => ipcRenderer.invoke('release:openLatest'),
   openReleaseAsset: (url: string) => ipcRenderer.invoke('release:openAsset', url),

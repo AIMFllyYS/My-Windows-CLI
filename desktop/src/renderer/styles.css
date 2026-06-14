@@ -31,6 +31,12 @@ input {
   min-height: 100vh;
 }
 
+.sidebar {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+}
+
 .sidebar,
 .inspector {
   border-color: rgba(244, 240, 232, 0.12);
@@ -41,6 +47,25 @@ input {
 .sidebar {
   border-right: 1px solid rgba(244, 240, 232, 0.12);
   padding: 22px;
+}
+
+.railFooter {
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid rgba(244, 240, 232, 0.1);
+}
+
+.railFooter p {
+  margin: 0 0 6px;
+  color: #9a9489;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.railFooter span {
+  color: #b8b0a3;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .brand {
@@ -108,8 +133,41 @@ input {
 
 .conversation {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
   min-width: 0;
+  min-height: 100vh;
+}
+
+.modeSwitchWrap {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.modeHint {
+  margin: 0;
+  color: #9a9489;
+  font-size: 12px;
+}
+
+.conversationStatus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 26px;
+  border-bottom: 1px solid rgba(244, 240, 232, 0.08);
+  color: #b8b0a3;
+  font-size: 13px;
+}
+
+.modeBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid rgba(155, 231, 199, 0.35);
+  border-radius: 999px;
+  color: #9be7c7;
+  font-size: 12px;
 }
 
 .topbar {
@@ -170,10 +228,30 @@ input {
 }
 
 .composer {
-  display: flex;
+  display: grid;
   gap: 10px;
-  padding: 18px 26px;
+  padding: 18px 26px 22px;
   border-top: 1px solid rgba(244, 240, 232, 0.1);
+  background: rgba(12, 13, 15, 0.72);
+}
+
+.composerField {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.composerPrefix {
+  color: #9be7c7;
+  font-weight: 700;
+  min-width: 58px;
+}
+
+.composerHint {
+  margin: 0;
+  color: #9a9489;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .composer input {
@@ -427,6 +505,9 @@ input {
 .inspector {
   border-left: 1px solid rgba(244, 240, 232, 0.12);
   padding: 20px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
 }
 
 .tabs {
@@ -439,6 +520,40 @@ input {
   padding: 14px;
   border: 1px solid rgba(244, 240, 232, 0.12);
   background: rgba(255, 255, 255, 0.035);
+  overflow: auto;
+}
+
+.settingsPanel,
+.settingsCopy,
+.settingsActions,
+.settingsSection {
+  display: grid;
+  gap: 12px;
+}
+
+.settingsCopy p,
+.settingsSection h3 {
+  margin: 0;
+}
+
+.settingsCopy code {
+  color: #9be7c7;
+}
+
+.settingsSection h3 {
+  font-size: 14px;
+  color: #f4f0e8;
+}
+
+.settingsActions {
+  padding: 12px;
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.settingsActions span {
+  color: #b8b0a3;
+  font-size: 12px;
 }
 
 .outputPanel {

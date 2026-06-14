@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import { killDesktopClearProcesses, scanDesktopClearProcesses } from './clear-actions';
-import { runDesktopCli } from './cli-runner';
+import { runDesktopCli, launchDesktopAiSession } from './cli-runner';
 import { getLatestRelease, getReleasePageUrl } from './github-release';
 import { listDesktopInstallTargets, runDesktopInstallTarget } from './install-actions';
 import { createReleaseAssetAllowlist, isAllowedReleaseAssetUrl, rememberReleaseAssetUrls } from './release-assets';
@@ -54,6 +54,13 @@ app.whenReady().then(() => {
       return runDesktopCli(command);
     }
     return { ok: false, output: 'IPC sender is not trusted.' };
+  });
+  ipcMain.handle('ai:launch', (event, request?: { mode?: string }) => {
+    const senderUrl = event.senderFrame?.url || '';
+    if (!isTrustedSender(senderUrl)) {
+      return { ok: false, output: 'IPC sender is not trusted.' };
+    }
+    return launchDesktopAiSession(request);
   });
   ipcMain.handle('release:getLatest', async (event) => {
     const senderUrl = event.senderFrame?.url || '';
