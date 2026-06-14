@@ -38,6 +38,7 @@ const COMMAND_DEFINITIONS: SlashCommandDefinition[] = [
   { id: 'search', command: '/search <query>', aliases: ['/s'], type: 'local', loadedFrom: 'builtin', category: 'Runtime', description: 'Search the web and summarize results', argumentHint: '<query>', mode: 'all' },
   { id: 'clear', command: '/clear', aliases: ['/c'], type: 'local', loadedFrom: 'builtin', category: 'Runtime', description: 'Clear conversation history', mode: 'all' },
   { id: 'skills', command: '/skills', type: 'local', loadedFrom: 'builtin', category: 'Skills', description: 'List runtime skills', mode: 'all' },
+  { id: 'skills-search', command: '/skills search <query>', type: 'local', loadedFrom: 'builtin', category: 'Skills', description: 'Search runtime skills by id, name, description, or trigger text', argumentHint: '<query>', mode: 'all' },
   { id: 'skill', command: '/skill <id|name>', type: 'local', loadedFrom: 'builtin', category: 'Skills', description: 'Load a skill into the AI context', argumentHint: '<id|name>', mode: 'all' },
   { id: 'help', command: '/help', aliases: ['/h'], type: 'local', loadedFrom: 'builtin', category: 'Help', description: 'Show help and slash commands', mode: 'all' },
   { id: 'exit', command: '/exit', aliases: ['/quit', '/q'], type: 'local', loadedFrom: 'builtin', category: 'Help', description: 'Exit after confirmation', mode: 'all' },
@@ -136,4 +137,18 @@ export function resolveModelCommand(args: string): ModelCommand {
   if (!trimmed) return { kind: 'selector' };
   if (trimmed.toLowerCase() === 'info') return { kind: 'info' };
   return { kind: 'select', modelId: trimmed };
+}
+
+export type SkillsCommand =
+  | { kind: 'list' }
+  | { kind: 'search'; query: string };
+
+export function resolveSkillsCommand(args: string): SkillsCommand {
+  const trimmed = args.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'list') return { kind: 'list' };
+  if (trimmed.toLowerCase() === 'search') return { kind: 'search', query: '' };
+  if (trimmed.toLowerCase().startsWith('search ')) {
+    return { kind: 'search', query: trimmed.slice('search '.length).trim() };
+  }
+  return { kind: 'list' };
 }
