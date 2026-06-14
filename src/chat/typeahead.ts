@@ -1,6 +1,7 @@
 import * as readline from 'readline';
 import chalk from 'chalk';
 import { getSlashMenuItems, SlashMenuItem } from './commands';
+import { resolveSlashPromptKeyAction } from './keybindings';
 import { AiMode } from './session';
 
 export interface SlashSuggestion {
@@ -337,71 +338,55 @@ export function promptWithSlashTypeahead(options: SlashPromptOptions): Promise<s
     };
 
     const onKeypress = (str: string | undefined, key: readline.Key) => {
-      if (key?.ctrl && key.name === 'c' && state.active) {
-        state = dismissSlashTypeahead(state);
-        options.onOverlayChange?.(false);
-        render();
-        return;
-      }
-      if (key?.name === 'escape' && state.active) {
-        state = dismissSlashTypeahead(state);
-        options.onOverlayChange?.(false);
-        render();
-        return;
-      }
-      if ((key?.name === 'up' || key?.name === 'k') && state.active) {
-        state = moveSlashSelection(state, -1);
-        render();
-        return;
-      }
-      if ((key?.name === 'down' || key?.name === 'j') && state.active) {
-        state = moveSlashSelection(state, 1);
-        render();
-        return;
-      }
-      if (key?.name === 'tab' && key.shift) {
-        if (state.active) {
+      const keyAction = resolveSlashPromptKeyAction(str, key, state.active);
+      switch (keyAction.action) {
+        case 'dismiss-suggestions':
           state = dismissSlashTypeahead(state);
           options.onOverlayChange?.(false);
           render();
-        }
-        return;
-      }
-      if (key?.name === 'tab' && state.active) {
-        const applied = applySlashSelection(state, 'tab');
-        if (applied.action === 'complete') value = applied.input;
-        refreshState();
-        render();
-        return;
-      }
-      if (key?.name === 'tab') {
-        const applied = applyMidInputSlashCompletion(value, value.length, options.mode);
-        if (applied) {
-          value = applied.input;
+          return;
+        case 'move-selection':
+          state = moveSlashSelection(state, keyAction.delta);
+          render();
+          return;
+        case 'complete-selection':
+          {
+            const applied = applySlashSelection(state, 'tab');
+            if (applied.action === 'complete') value = applied.input;
+            refreshState();
+            render();
+          }
+          return;
+        case 'complete-mid-input':
+          {
+            const applied = applyMidInputSlashCompletion(value, value.length, options.mode);
+            if (applied) {
+              value = applied.input;
+              refreshState();
+              render();
+            }
+          }
+          return;
+        case 'submit':
+          if (state.active) {
+            const applied = applySlashSelection(state, 'enter');
+            finish(applied.input);
+            return;
+          }
+          finish(value);
+          return;
+        case 'backspace':
+          value = value.slice(0, -1);
           refreshState();
           render();
-        }
-        return;
-      }
-      if (key?.name === 'return') {
-        if (state.active) {
-          const applied = applySlashSelection(state, 'enter');
-          finish(applied.input);
           return;
-        }
-        finish(value);
-        return;
-      }
-      if (key?.name === 'backspace') {
-        value = value.slice(0, -1);
-        refreshState();
-        render();
-        return;
-      }
-      if (str && !key?.ctrl && !key?.meta) {
-        value += str;
-        refreshState();
-        render();
+        case 'insert':
+          value += keyAction.value;
+          refreshState();
+          render();
+          return;
+        case 'none':
+          return;
       }
     };
 
