@@ -3,6 +3,13 @@ import chalk from 'chalk';
 import { getSlashMenuItems, SlashMenuItem } from './commands';
 import { resolveSlashPromptKeyAction } from './keybindings';
 import { AiMode } from './session';
+import { isPathLikeToken, getPathSuggestions } from './path-completion';
+import type { SuggestionItem } from './suggestions';
+import {
+  collectUnifiedSuggestions,
+  filterUnifiedSuggestions,
+  createCommandSuggestion,
+} from './suggestions';
 
 export interface SlashSuggestion {
   id: string;
@@ -399,3 +406,39 @@ export function promptWithSlashTypeahead(options: SlashPromptOptions): Promise<s
     input.on('keypress', onKeypress);
   });
 }
+
+/**
+ * Build a unified suggestion list from slash commands and optional path/skill/model/agent sources.
+ * Re-exported for use by the chat runtime and tests.
+ */
+export function getUnifiedSuggestions(
+  mode: AiMode,
+  opts?: {
+    skills?: Array<{ id: string; name: string; description: string }>;
+    models?: string[];
+    agents?: Array<{ id: string; name: string; description: string }>;
+    pathItems?: SuggestionItem[];
+    maxResults?: number;
+  },
+): SuggestionItem[] {
+  const items = getSlashMenuItems(mode);
+  return collectUnifiedSuggestions({
+    commands: items.map((item) => ({
+      id: item.id,
+      command: item.command,
+      description: item.description,
+      aliases: item.aliases,
+      argumentHint: item.argumentHint,
+      loadedFrom: item.loadedFrom,
+    })),
+    skills: opts?.skills,
+    models: opts?.models,
+    agents: opts?.agents,
+    pathItems: opts?.pathItems,
+    maxResults: opts?.maxResults,
+  });
+}
+
+export { isPathLikeToken, getPathSuggestions };
+export type { SuggestionItem };
+export { collectUnifiedSuggestions, filterUnifiedSuggestions, createCommandSuggestion };

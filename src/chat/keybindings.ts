@@ -13,6 +13,7 @@ export type SlashPromptKeyAction =
   | { action: 'move-selection'; delta: -1 | 1 }
   | { action: 'complete-selection' }
   | { action: 'complete-mid-input' }
+  | { action: 'complete-path' }
   | { action: 'submit' }
   | { action: 'backspace' }
   | { action: 'insert'; value: string }
