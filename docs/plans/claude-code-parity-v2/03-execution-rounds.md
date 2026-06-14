@@ -2,6 +2,30 @@
 
 > For agentic workers: execute one round per AI interaction unless the user explicitly authorizes batching. Each round must end with local verification and a local commit.
 
+For Cursor Claude Opus handoff, prefer the single-round files under `docs/plans/claude-code-parity-v2/rounds/`. This document is the full ordered master list; the `rounds/` files are copy-ready execution packets.
+
+## Per-Round Handoff Files
+
+- Round 00: `rounds/round-00-planning-pack-checkpoint.md`
+- Round 01: `rounds/round-01-slash-command-registry-and-menu-parity.md`
+- Round 02: `rounds/round-02-path-completion-and-unified-suggestions.md`
+- Round 03: `rounds/round-03-utf8-and-terminal-glyph-repair.md`
+- Round 04: `rounds/round-04-permission-dialog-deep-port.md`
+- Round 05: `rounds/round-05-file-diff-and-edit-permission-ux.md`
+- Round 06: `rounds/round-06-shell-and-powershell-safety-port.md`
+- Round 07: `rounds/round-07-interrupt-and-exit-parity.md`
+- Round 08: `rounds/round-08-query-engine-and-tool-pairing-discipline.md`
+- Round 09: `rounds/round-09-plan-mode-approval-lifecycle.md`
+- Round 10: `rounds/round-10-skills-runtime-split-and-search.md`
+- Round 11: `rounds/round-11-agent-definitions-and-memory-snapshot.md`
+- Round 12: `rounds/round-12-subagent-activity-timeline-and-scheduling.md`
+- Round 13: `rounds/round-13-model-settings-metadata.md`
+- Round 14: `rounds/round-14-terminal-ui-visual-parity.md`
+- Round 15: `rounds/round-15-desktop-command-dashboard-hardening.md`
+- Round 16: `rounds/round-16-desktop-visual-parity-and-ai-bridge.md`
+- Round 17: `rounds/round-17-github-release-workflow-and-asset-verification.md`
+- Round 18: `rounds/round-18-final-forbidden-port-audit-and-release-readiness.md`
+
 ## Round 0: Planning Pack Checkpoint
 
 **Goal:** Commit this planning pack as the execution source of truth.

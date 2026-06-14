@@ -13,7 +13,9 @@ If working in a separate worktree, use `superpowers:using-git-worktrees` first.
 
 ## Per-Round Cursor/Opus Prompt Template
 
-Use this exact structure when handing one round to Cursor Claude Opus 4.6 thinking Max:
+Preferred path: give Cursor Claude Opus 4.6 thinking Max exactly one file from `docs/plans/claude-code-parity-v2/rounds/`.
+
+If a custom prompt is needed, use this structure:
 
 ```text
 你在 D:\new_project\My-CLI 工作。保护 UTF-8 中文，不要改坏中文。

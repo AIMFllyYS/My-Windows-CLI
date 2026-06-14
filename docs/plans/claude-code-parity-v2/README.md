@@ -17,10 +17,11 @@
 - `02-claude-source-transplant-map.md`: Claude Code source areas, My-CLI target modules, copy/adapt/delete rules.
 - `03-execution-rounds.md`: the ordered implementation rounds for Cursor Claude Opus 4.6 thinking Max or future Codex sessions.
 - `04-verification-and-handoff.md`: global verification matrix, per-round prompt template, commit rules, and handoff protocol.
+- `rounds/`: one self-contained handoff `.md` per round, designed for direct Cursor/Opus execution.
 
 ## Execution Rule
 
-Execute exactly one round at a time. A round is not complete until:
+Execute exactly one round handoff file at a time from `rounds/`. A round is not complete until:
 
 1. Its targeted tests exist and pass.
 2. `npm run build` passes.
