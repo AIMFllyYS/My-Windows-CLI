@@ -238,3 +238,65 @@ test('getRecentDenials limits results and handles empty session', () => {
   assert.deepEqual(getRecentDenials(undefined), []);
   assert.deepEqual(getRecentDenials({}), []);
 });
+
+test('decidePermission denies catastrophic shell commands even in bypass mode', () => {
+  const { decidePermission } = require('../dist/chat/permissions/engine');
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-perm-catastrophic-'));
+
+  const decision = decidePermission({
+    mode: 'agent',
+    permissionMode: 'bypass',
+    tool: { name: 'shell', kind: 'shell' },
+    input: { command: 'Format-Volume', args: ['-DriveLetter', 'C'] },
+    workspaceRoot: workspace,
+  });
+
+  assert.equal(decision.decision, 'deny');
+  assert.match(decision.reason, /catastrophic/i);
+});
+
+test('decidePermission forces ask for destructive shell commands in bypass mode', () => {
+  const { decidePermission } = require('../dist/chat/permissions/engine');
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-perm-destructive-'));
+
+  const decision = decidePermission({
+    mode: 'agent',
+    permissionMode: 'bypass',
+    tool: { name: 'shell', kind: 'shell' },
+    input: { command: 'git', args: ['reset', '--hard'] },
+    workspaceRoot: workspace,
+  });
+
+  assert.equal(decision.decision, 'ask');
+  assert.match(decision.reason, /destructive/i);
+});
+
+test('decidePermission allows safe shell commands in bypass mode', () => {
+  const { decidePermission } = require('../dist/chat/permissions/engine');
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-perm-safe-shell-'));
+
+  const decision = decidePermission({
+    mode: 'agent',
+    permissionMode: 'bypass',
+    tool: { name: 'shell', kind: 'shell' },
+    input: { command: 'node', args: ['--version'] },
+    workspaceRoot: workspace,
+  });
+
+  assert.equal(decision.decision, 'allow');
+});
+
+test('decidePermission denies workspace-escape removals even in bypass mode', () => {
+  const { decidePermission } = require('../dist/chat/permissions/engine');
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-perm-escape-'));
+
+  const decision = decidePermission({
+    mode: 'agent',
+    permissionMode: 'bypass',
+    tool: { name: 'shell', kind: 'shell' },
+    input: { command: 'Remove-Item', args: ['-Recurse', '-Force', 'C:\\Windows\\System32'] },
+    workspaceRoot: workspace,
+  });
+
+  assert.equal(decision.decision, 'deny');
+});

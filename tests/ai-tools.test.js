@@ -260,3 +260,83 @@ test('legacy executeTool uses safe read implementation', async () => {
     process.chdir(originalCwd);
   }
 });
+
+test('classifyShellCommand detects destructive patterns', () => {
+  const { classifyShellCommand } = require('../dist/chat/tools/shell');
+
+  const rmForce = classifyShellCommand('Remove-Item', ['-Recurse', '-Force', './data']);
+  assert.equal(rmForce.level, 'destructive');
+  assert.match(rmForce.warning, /recursively/i);
+
+  const gitHard = classifyShellCommand('git', ['reset', '--hard']);
+  assert.equal(gitHard.level, 'destructive');
+  assert.match(gitHard.warning, /uncommitted/i);
+
+  const gitForcePush = classifyShellCommand('git', ['push', '--force', 'origin', 'main']);
+  assert.equal(gitForcePush.level, 'destructive');
+  assert.match(gitForcePush.warning, /remote history/i);
+
+  const gitClean = classifyShellCommand('git', ['clean', '-fd']);
+  assert.equal(gitClean.level, 'destructive');
+  assert.match(gitClean.warning, /untracked/i);
+
+  const formatVol = classifyShellCommand('Format-Volume', ['-DriveLetter', 'D']);
+  assert.equal(formatVol.level, 'catastrophic');
+
+  const safe = classifyShellCommand('node', ['--version']);
+  assert.equal(safe.level, 'safe');
+  assert.equal(safe.warning, null);
+});
+
+test('classifyShellCommand detects PowerShell-specific dangers', () => {
+  const { classifyShellCommand } = require('../dist/chat/tools/shell');
+
+  const iex = classifyShellCommand('powershell', ['-Command', 'Invoke-Expression', '$code']);
+  assert.equal(iex.level, 'destructive');
+
+  const encoded = classifyShellCommand('pwsh', ['-EncodedCommand', 'BASE64']);
+  assert.equal(encoded.level, 'destructive');
+  assert.match(encoded.warning, /encoded/i);
+
+  const stopComputer = classifyShellCommand('Stop-Computer', []);
+  assert.equal(stopComputer.level, 'catastrophic');
+
+  const clearDisk = classifyShellCommand('Clear-Disk', ['-Number', '0']);
+  assert.equal(clearDisk.level, 'catastrophic');
+});
+
+test('classifyShellCommand detects workspace escape commands', () => {
+  const { classifyShellCommand } = require('../dist/chat/tools/shell');
+
+  const rmRoot = classifyShellCommand('Remove-Item', ['-Recurse', '-Force', '/']);
+  assert.equal(rmRoot.level, 'catastrophic');
+
+  const rmHome = classifyShellCommand('rm', ['-rf', '~']);
+  assert.equal(rmHome.level, 'catastrophic');
+
+  const delSystem32 = classifyShellCommand('Remove-Item', ['-Recurse', 'C:\\Windows\\System32']);
+  assert.equal(delSystem32.level, 'catastrophic');
+});
+
+test('runShellTool denies catastrophic commands even in bypass mode', async () => {
+  const { runShellTool } = require('../dist/chat/tools/shell');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-shell-catastrophic-'));
+
+  const result = await runShellTool({
+    command: 'Format-Volume',
+    args: ['-DriveLetter', 'C'],
+    cwd: dir,
+    workspaceRoot: dir,
+    permissionDecision: { decision: 'allow', reason: 'bypass mode' },
+  });
+
+  assert.match(result, /catastrophic|blocked|denied/i);
+});
+
+test('runShellTool returns warning for destructive git commands', async () => {
+  const { classifyShellCommand } = require('../dist/chat/tools/shell');
+
+  const gitStashDrop = classifyShellCommand('git', ['stash', 'drop']);
+  assert.equal(gitStashDrop.level, 'destructive');
+  assert.match(gitStashDrop.warning, /stash/i);
+});

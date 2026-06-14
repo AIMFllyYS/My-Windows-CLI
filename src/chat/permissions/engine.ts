@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AiMode, PermissionMode } from '../session';
 import { getToolDefinition, ToolDefinition } from '../tools/registry';
+import { classifyShellCommand } from '../tools/shell';
 
 export type PermissionDecisionValue = 'allow' | 'ask' | 'deny';
 
@@ -201,6 +202,12 @@ export function decidePermission(request: PermissionRequest): PermissionDecision
   if (request.session?.allowedTools?.has(request.tool.name)) {
     return { decision: 'allow', reason: 'tool allowed for this session' };
   }
+
+  if (tool.kind === 'shell' && request.mode === 'agent') {
+    const shellClassification = classifyShellInput(request.input);
+    if (shellClassification.decision !== 'allow') return shellClassification;
+  }
+
   if (request.mode === 'agent' && request.permissionMode === 'bypass') {
     return { decision: 'allow', reason: 'agent bypass mode' };
   }
@@ -209,4 +216,19 @@ export function decidePermission(request: PermissionRequest): PermissionDecision
   }
 
   return { decision: 'deny', reason: 'mode not allowed for tool' };
+}
+
+function classifyShellInput(input?: { path?: string; command?: string; args?: string[]; [key: string]: unknown }): PermissionDecision {
+  if (!input || typeof input.command !== 'string') {
+    return { decision: 'allow', reason: 'no shell command to classify' };
+  }
+  const args: string[] = Array.isArray(input.args) ? input.args.map(String) : [];
+  const classification = classifyShellCommand(input.command, args);
+  if (classification.level === 'catastrophic') {
+    return { decision: 'deny', reason: `catastrophic command blocked: ${classification.warning}` };
+  }
+  if (classification.level === 'destructive') {
+    return { decision: 'ask', reason: `destructive command requires confirmation: ${classification.warning}` };
+  }
+  return { decision: 'allow', reason: 'shell command classified as safe' };
 }

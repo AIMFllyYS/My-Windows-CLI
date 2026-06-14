@@ -4,6 +4,7 @@ import { executeToolCall } from '../tools/runner';
 import { renderFileChangePreview, renderPermissionBox, renderRecentDenials } from '../ui/layout';
 import { getRecentDenials } from './engine';
 import type { FileChangeOperation } from '../tools/fs-write';
+import { classifyShellCommand, getDestructiveCommandWarning } from '../tools/shell';
 
 export interface FilePermissionBoxInput {
   tool: string;
@@ -81,6 +82,21 @@ export function formatPermissionPromptOptions(): string {
 export function formatRecentDenials(session?: SessionPermissionMemory): string {
   const denials = getRecentDenials(session);
   return renderRecentDenials({ denials });
+}
+
+export function formatShellPermissionPrompt(input: { command: string; args?: string[] }): string {
+  const args = input.args || [];
+  const classification = classifyShellCommand(input.command, args);
+  const commandLine = [input.command, ...args].join(' ');
+  const lines: string[] = [];
+  lines.push(`  Shell: ${commandLine}`);
+  if (classification.warning) {
+    lines.push(`  ⚠ ${classification.warning}`);
+  }
+  if (classification.level === 'catastrophic') {
+    lines.push('  ✖ This command is blocked and cannot be approved.');
+  }
+  return lines.join('\n');
 }
 
 function parseToolArguments(toolCall: Extract<RunAgentTurnResult, { status: 'permission_required' }>['pendingToolCall']): Record<string, unknown> {
