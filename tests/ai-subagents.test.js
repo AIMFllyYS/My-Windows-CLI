@@ -100,6 +100,29 @@ test('subagent message builder injects selected agent definition prompt', () => 
   assert.doesNotMatch(messages[0].content, /Anthropic account|telemetry|oauth/i);
 });
 
+test('subagent message builder includes parent recent messages snapshot', () => {
+  const { buildSubagentMessages } = require('../dist/chat/agent/prompt');
+
+  const messages = buildSubagentMessages({
+    prompt: 'Inspect auth middleware',
+    mode: 'agent',
+    permissionMode: 'ask',
+    allowedTools: ['read_file'],
+    skillIds: ['test-driven-development'],
+    modelId: 'model-a',
+    currentPlanPath: '/tmp/plan.md',
+    parentRecentMessages: [
+      { role: 'user', content: '请检查登录中间件' },
+      { role: 'assistant', content: '我先读取 src/auth.ts。' },
+    ],
+  });
+
+  assert.match(messages[0].content, /Parent Recent Messages/);
+  assert.match(messages[0].content, /Plan file: \/tmp\/plan.md/);
+  assert.match(messages[0].content, /请检查登录中间件/);
+  assert.match(messages[0].content, /我先读取 src\/auth.ts/);
+});
+
 test('built-in and project agent definitions load without account telemetry behavior', () => {
   const { listAgentDefinitions, resolveAgentDefinition } = require('../dist/chat/agent/definitions');
   const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-agent-defs-'));
@@ -107,6 +130,7 @@ test('built-in and project agent definitions load without account telemetry beha
   fs.mkdirSync(agentDir, { recursive: true });
   fs.writeFileSync(path.join(agentDir, 'reviewer.md'), [
     '---',
+    'name: reviewer',
     'description: 代码审查 agent',
     'tools: read_file,search_files',
     'skills: test-driven-development',
@@ -119,9 +143,14 @@ test('built-in and project agent definitions load without account telemetry beha
   const agents = listAgentDefinitions(workspaceRoot);
   const names = agents.map((agent) => agent.agentType);
   assert.ok(names.includes('general-purpose'));
+  assert.ok(names.includes('explore'));
   assert.ok(names.includes('plan'));
   assert.ok(names.includes('verification'));
   assert.ok(names.includes('reviewer'));
+
+  const explore = resolveAgentDefinition(workspaceRoot, 'explore');
+  assert.equal(explore.permissionMode, 'plan');
+  assert.deepEqual(explore.tools, ['list_files', 'read_file', 'search_files']);
 
   const plan = resolveAgentDefinition(workspaceRoot, 'plan');
   assert.match(plan.systemPrompt, /READ-ONLY/i);
@@ -134,6 +163,87 @@ test('built-in and project agent definitions load without account telemetry beha
   assert.deepEqual(reviewer.skills, ['test-driven-development']);
 
   assert.doesNotMatch(agents.map((agent) => agent.systemPrompt).join('\n'), /oauth|login|logout|telemetry|analytics|subscription|anthropic account/i);
+});
+
+test('user agent definitions load from home root and project overrides user', () => {
+  const { listAgentDefinitions } = require('../dist/chat/agent/definitions');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-agent-user-'));
+  const homeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-agent-home-'));
+  const userDir = path.join(homeRoot, '.0-1-cli', 'agents');
+  const projectDir = path.join(workspaceRoot, '.0-1-cli', 'agents');
+  fs.mkdirSync(userDir, { recursive: true });
+  fs.mkdirSync(projectDir, { recursive: true });
+
+  fs.writeFileSync(path.join(userDir, 'helper.md'), [
+    '---',
+    'name: helper',
+    'description: 用户级 helper',
+    '---',
+    'User helper prompt.',
+  ].join('\n'), 'utf8');
+  fs.writeFileSync(path.join(projectDir, 'helper.md'), [
+    '---',
+    'name: helper',
+    'description: 项目级 helper',
+    '---',
+    'Project helper prompt.',
+  ].join('\n'), 'utf8');
+
+  const agents = listAgentDefinitions(workspaceRoot, homeRoot);
+  const helper = agents.find((agent) => agent.agentType === 'helper');
+  assert.ok(helper);
+  assert.equal(helper.source, 'project');
+  assert.match(helper.systemPrompt, /Project helper prompt/);
+});
+
+test('agent memory snapshot initializes local memory from project snapshot', () => {
+  const {
+    checkAgentMemorySnapshot,
+    initializeFromSnapshot,
+    loadAgentMemoryPrompt,
+    resolveAgentSystemPrompt,
+  } = require('../dist/chat/agent/definitions');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-agent-memory-'));
+  const snapshotDir = path.join(workspaceRoot, '.0-1-cli', 'agent-memory-snapshots', 'review-bot');
+  fs.mkdirSync(snapshotDir, { recursive: true });
+  fs.writeFileSync(path.join(snapshotDir, 'snapshot.json'), JSON.stringify({ updatedAt: '2026-06-14T10:00:00.000Z' }), 'utf8');
+  fs.writeFileSync(path.join(snapshotDir, 'MEMORY.md'), '# Review notes\nPrefer read-only checks.\n', 'utf8');
+
+  const firstCheck = checkAgentMemorySnapshot('review-bot', 'project', workspaceRoot);
+  assert.equal(firstCheck.action, 'initialize');
+  initializeFromSnapshot('review-bot', 'project', workspaceRoot, firstCheck.snapshotTimestamp);
+  const secondCheck = checkAgentMemorySnapshot('review-bot', 'project', workspaceRoot);
+  assert.equal(secondCheck.action, 'none');
+
+  const prompt = resolveAgentSystemPrompt({
+    agentType: 'review-bot',
+    whenToUse: 'Review bot',
+    source: 'project',
+    baseDir: workspaceRoot,
+    systemPrompt: 'Review carefully.',
+    memory: 'project',
+  }, workspaceRoot);
+
+  assert.match(prompt, /Review carefully/);
+  assert.match(prompt, /Persistent Agent Memory/);
+  assert.match(prompt, /Prefer read-only checks/);
+  assert.match(loadAgentMemoryPrompt('review-bot', 'project', workspaceRoot), /Prefer read-only checks/);
+});
+
+test('slash command registry exposes agent definitions listing command', () => {
+  const { getSlashCommandDefinitions, isAgentDefinitionsCommand, formatAgentDefinitionsList } = require('../dist/chat/commands');
+  const { listAgentDefinitions } = require('../dist/chat/agent/definitions');
+
+  const defs = getSlashCommandDefinitions('agent').find((item) => item.id === 'agent-defs');
+  assert.ok(defs);
+  assert.match(defs.command, /\/agent defs/);
+  assert.ok(isAgentDefinitionsCommand('defs'));
+  assert.ok(isAgentDefinitionsCommand('definitions'));
+
+  const rendered = formatAgentDefinitionsList(listAgentDefinitions());
+  assert.match(rendered, /general-purpose/);
+  assert.match(rendered, /explore/);
+  assert.match(rendered, /built-in/);
 });
 
 test('AI subagent handler uses scoped prompt tool loop and allowed tool specs', async () => {

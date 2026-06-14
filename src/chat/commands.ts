@@ -31,6 +31,7 @@ const COMMAND_DEFINITIONS: SlashCommandDefinition[] = [
   { id: 'plan-open', command: '/plan open', type: 'local', loadedFrom: 'builtin', category: 'Mode', description: 'Show the current saved plan file', mode: 'all' },
   { id: 'agent-spawn', command: '/agent spawn <task>', type: 'local', loadedFrom: 'builtin', category: 'Agent', description: 'Start a scoped local subagent', argumentHint: '<task>', mode: 'agent' },
   { id: 'agent-list', command: '/agent list', type: 'local', loadedFrom: 'builtin', category: 'Agent', description: 'Show queued and running subagents', mode: 'agent' },
+  { id: 'agent-defs', command: '/agent defs', type: 'local', loadedFrom: 'builtin', category: 'Agent', description: 'List built-in and local agent definitions', mode: 'agent' },
   { id: 'agent-cancel', command: '/agent cancel <id>', type: 'local', loadedFrom: 'builtin', category: 'Agent', description: 'Cancel a queued or running subagent', argumentHint: '<id>', mode: 'agent' },
   { id: 'setting', command: '/setting', aliases: ['/settings'], type: 'local', loadedFrom: 'builtin', category: 'Runtime', description: 'Configure URL, API key, and model IDs', argumentHint: 'URL / API Key / Model IDs', mode: 'all' },
   { id: 'model', command: '/model', aliases: ['/m'], type: 'local', loadedFrom: 'builtin', category: 'Runtime', description: 'Choose a configured model', argumentHint: '[model id]', mode: 'all' },
@@ -151,4 +152,22 @@ export function resolveSkillsCommand(args: string): SkillsCommand {
     return { kind: 'search', query: trimmed.slice('search '.length).trim() };
   }
   return { kind: 'list' };
+}
+
+export function isAgentDefinitionsCommand(args: string): boolean {
+  const normalized = args.trim().toLowerCase();
+  return normalized === 'defs' || normalized === 'definitions';
+}
+
+export function formatAgentDefinitionsList(
+  agents: Array<{ agentType: string; whenToUse: string; source: string; permissionMode?: string }>
+): string {
+  if (!agents.length) return 'No agent definitions found.';
+  const typeWidth = Math.max(...agents.map((agent) => agent.agentType.length), 'agentType'.length);
+  return agents
+    .map((agent) => {
+      const permission = agent.permissionMode ? ` permission=${agent.permissionMode}` : '';
+      return `${agent.agentType.padEnd(typeWidth)}  [${agent.source}]${permission}  ${agent.whenToUse}`;
+    })
+    .join('\n');
 }

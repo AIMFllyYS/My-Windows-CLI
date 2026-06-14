@@ -1,3 +1,4 @@
+import { ChatMessage } from '../../types';
 import { AiMode, PermissionMode } from '../session';
 
 export type SubagentStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
@@ -14,6 +15,7 @@ export interface SubagentTaskInput {
   currentPlanPath?: string;
   agentType?: string;
   agentSystemPrompt?: string;
+  parentRecentMessages?: ChatMessage[];
 }
 
 export interface SubagentResult {
@@ -34,6 +36,7 @@ export interface SubagentTask extends Required<Pick<SubagentTaskInput, 'prompt'>
   currentPlanPath?: string;
   agentType?: string;
   agentSystemPrompt?: string;
+  parentRecentMessages: ChatMessage[];
   createdAt: number;
   startedAt?: number;
   completedAt?: number;

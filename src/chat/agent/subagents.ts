@@ -46,6 +46,7 @@ export function enqueueSubagent(queue: SubagentQueue, input: SubagentTaskInput):
     currentPlanPath: input.currentPlanPath,
     agentType: input.agentType,
     agentSystemPrompt: input.agentSystemPrompt,
+    parentRecentMessages: input.parentRecentMessages || [],
     createdAt: Date.now(),
   };
   queue.items.push(task);
