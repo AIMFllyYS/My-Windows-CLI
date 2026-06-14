@@ -48,7 +48,7 @@ function visibleCommand(item: SlashMenuItem): string {
 
 function toSuggestion(item: SlashMenuItem, matchedAlias?: string): SlashSuggestion {
   return {
-    id: item.command,
+    id: item.id,
     command: visibleCommand(item),
     description: item.description,
     ...(item.argumentHint ? { argumentHint: item.argumentHint } : {}),

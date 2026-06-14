@@ -47,6 +47,48 @@ test('slash typeahead can suggest commands through aliases without exposing acco
   assert.doesNotMatch(exported, /login|logout|oauth|telemetry|analytics|subscription/);
 });
 
+test('slash command definitions have stable IDs distinct from display command', () => {
+  const { getSlashCommandDefinitions } = require('../dist/chat/commands');
+
+  const definitions = getSlashCommandDefinitions('agent');
+  const ids = definitions.map((item) => item.id);
+
+  assert.ok(ids.every((id) => typeof id === 'string' && id.length > 0));
+  assert.ok(ids.includes('chat'));
+  assert.ok(ids.includes('agent'));
+  assert.ok(ids.includes('agent-spawn'));
+  assert.ok(ids.includes('model'));
+  assert.ok(ids.includes('model-info'));
+  assert.ok(ids.includes('skills'));
+  assert.ok(ids.includes('skill'));
+  assert.ok(ids.includes('exit'));
+  const unique = new Set(ids);
+  assert.equal(unique.size, ids.length, 'IDs must be unique');
+});
+
+test('slash menu groups commands in order Mode Agent Runtime Skills Help', () => {
+  const { formatSlashMenu, getSlashCommandDefinitions } = require('../dist/chat/commands');
+
+  const menu = formatSlashMenu('agent');
+  const definitions = getSlashCommandDefinitions('agent');
+
+  const modeIdx = menu.indexOf('Mode');
+  const agentIdx = menu.indexOf('Agent');
+  const runtimeIdx = menu.indexOf('Runtime');
+  const skillsIdx = menu.indexOf('Skills');
+  const helpIdx = menu.indexOf('Help');
+
+  assert.ok(modeIdx >= 0, 'Mode category must exist');
+  assert.ok(agentIdx > modeIdx, 'Agent must follow Mode');
+  assert.ok(runtimeIdx > agentIdx, 'Runtime must follow Agent');
+  assert.ok(skillsIdx > runtimeIdx, 'Skills must follow Runtime');
+  assert.ok(helpIdx > skillsIdx, 'Help must follow Skills');
+
+  const skillsItems = definitions.filter((item) => item.category === 'Skills');
+  assert.ok(skillsItems.some((item) => item.command === '/skills'));
+  assert.ok(skillsItems.some((item) => item.command === '/skill <id|name>'));
+});
+
 test('slash suggestions expose matched aliases like Claude command suggestions', () => {
   const { createSlashTypeaheadState, renderSlashTypeahead } = require('../dist/chat/typeahead');
   const state = createSlashTypeaheadState('/q', 'agent');

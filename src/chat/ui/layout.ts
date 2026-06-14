@@ -127,3 +127,13 @@ export function renderTimelineEntry(input: TimelineEntryInput): string {
   const detail = input.detail && maxDetailWidth > 0 ? ui.muted(` - ${truncateVisible(input.detail, maxDetailWidth)}`) : '';
   return `  ${ui.muted(icon)} ${ui.strong(labelText)} ${status}${detail}`;
 }
+
+export function renderKeyboardHintRow(): string {
+  const hints = [
+    `${ui.muted('Esc')} dismiss`,
+    `${ui.muted('Tab')} complete`,
+    `${ui.muted('Enter')} execute`,
+    `${ui.muted('Up/Down')} navigate`,
+  ];
+  return `  ${truncateVisible(hints.join(ui.muted(' | ')), UI_WIDTH)}`;
+}

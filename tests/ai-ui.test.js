@@ -158,10 +158,11 @@ test('mode pill renders all modes without exceeding status width', () => {
   }
 });
 
-test('slash menu exposes mode and runtime commands', () => {
+test('slash menu exposes mode and runtime commands with Skills group', () => {
   const { formatSlashMenu, getSlashMenuItems } = require('../dist/chat/commands');
 
   const chatMenu = formatSlashMenu('chat');
+  const agentMenu = formatSlashMenu('agent');
   const agentItems = getSlashMenuItems('agent').map((item) => item.command);
 
   assert.match(chatMenu, /\/chat/);
@@ -170,9 +171,12 @@ test('slash menu exposes mode and runtime commands', () => {
   assert.doesNotMatch(chatMenu, /\/agent spawn <task>/);
   assert.ok(agentItems.includes('/agent spawn <task>'));
   assert.ok(agentItems.includes('/skills'));
+  assert.match(agentMenu, /Skills/);
+  assert.match(agentMenu, /\/skills/);
+  assert.match(agentMenu, /\/skill <id\|name>/);
 });
 
-test('slash menu groups commands with Claude-style source metadata', () => {
+test('slash menu groups commands with Claude-style source metadata and Skills category', () => {
   const {
     formatDescriptionWithSource,
     formatSlashMenu,
@@ -183,15 +187,18 @@ test('slash menu groups commands with Claude-style source metadata', () => {
   const definitions = getSlashCommandDefinitions('agent');
   const spawn = definitions.find((item) => item.command === '/agent spawn <task>');
   const skill = definitions.find((item) => item.command === '/skill <id|name>');
+  const skills = definitions.find((item) => item.command === '/skills');
 
   assert.match(menu, /Mode/);
   assert.match(menu, /Agent/);
   assert.match(menu, /Runtime/);
+  assert.match(menu, /Skills/);
   assert.match(menu, /\[builtin\]/);
   assert.equal(spawn.category, 'Agent');
   assert.equal(spawn.loadedFrom, 'builtin');
   assert.equal(spawn.argumentHint, '<task>');
-  assert.equal(skill.category, 'Runtime');
+  assert.equal(skill.category, 'Skills');
+  assert.equal(skills.category, 'Skills');
   assert.equal(formatDescriptionWithSource(spawn), 'Start a scoped local subagent [builtin]');
 });
 
@@ -245,4 +252,16 @@ test('chat runtime wires mode-cycle shortcuts into the keypress handler', () => 
   assert.match(source, /cycleMode/);
   assert.match(source, /shift/);
   assert.match(source, /meta/);
+});
+
+test('keyboard hint row renders navigational shortcuts without exceeding status width', () => {
+  const { renderKeyboardHintRow } = require('../dist/chat/ui/layout');
+
+  const output = stripAnsi(renderKeyboardHintRow());
+
+  assert.match(output, /Esc/);
+  assert.match(output, /Tab/);
+  assert.match(output, /Enter/);
+  assert.match(output, /navigate/);
+  assert.ok(visibleLength(output) <= 66, `hint row too wide: ${output}`);
 });
