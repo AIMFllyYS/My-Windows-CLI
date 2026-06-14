@@ -82,6 +82,14 @@ export function getToolDefinition(name: string): ToolDefinition {
   return found;
 }
 
+export function isKnownTool(name: string): boolean {
+  return TOOL_REGISTRY.some((tool) => tool.name === name);
+}
+
+export function formatToolInputError(toolName: string, reason: string): string {
+  return `Tool error (${toolName}): ${reason}`;
+}
+
 export function toolForLegacyCommand(command: string): ToolDefinition | undefined {
   const normalized = command.toLowerCase();
   if (normalized === 'ls' || normalized === 'dir') return getToolDefinition('list_files');

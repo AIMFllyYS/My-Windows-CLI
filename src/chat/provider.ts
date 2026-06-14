@@ -92,6 +92,18 @@ function requestForProvider(provider: ProviderSpec) {
   return { request: requestModule.request, agent };
 }
 
+export function shouldAttachProviderTools(
+  model: Pick<ModelInfo, 'provider'>,
+  provider: Pick<ProviderSpec, 'name'>,
+  tools?: unknown[],
+): boolean {
+  return Boolean(
+    tools &&
+    tools.length > 0 &&
+    (provider.name === 'custom' || model.provider === 'zhipu'),
+  );
+}
+
 /**
  * Streaming chat completion - works for both DeepSeek and ZhiPu
  */
@@ -116,7 +128,7 @@ export function streamChat(
     max_tokens: 4096,
   };
 
-  if (tools && tools.length > 0 && model.provider === 'zhipu') {
+  if (shouldAttachProviderTools(model, provider, tools)) {
     body.tools = tools;
   }
 
@@ -245,7 +257,7 @@ export function chatCompleteMessage(messages: ChatMessage[], model: ModelInfo, t
     }
 
     const body: any = { model: provider.modelId, messages, stream: false, max_tokens: 4096 };
-    if (tools && tools.length > 0 && (model.provider === 'zhipu' || provider.name === 'custom')) {
+    if (shouldAttachProviderTools(model, provider, tools)) {
       body.tools = tools;
     }
     const data = JSON.stringify(body);

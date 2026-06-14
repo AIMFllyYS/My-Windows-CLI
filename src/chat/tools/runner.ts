@@ -4,7 +4,7 @@ import { decidePermission, PermissionDecision, SessionPermissionMemory } from '.
 import { listFilesTool, readFileTool, searchFilesTool } from './fs-read';
 import { computeFileChangeSummary, FileChangeSummary, writeFileTool } from './fs-write';
 import { runShellTool } from './shell';
-import { getToolDefinition } from './registry';
+import { formatToolInputError, getToolDefinition, isKnownTool } from './registry';
 
 export interface ExecuteToolCallInput {
   toolCall: ToolCall;
@@ -22,6 +22,10 @@ export interface ExecuteToolCallResult {
   fileChangeSummary?: FileChangeSummary;
 }
 
+export type ParsedToolArguments =
+  | { ok: true; args: Record<string, unknown> }
+  | { ok: false; error: string };
+
 function toolMessage(toolCall: ToolCall, content: string): ChatMessage {
   return {
     role: 'tool',
@@ -30,13 +34,27 @@ function toolMessage(toolCall: ToolCall, content: string): ChatMessage {
   };
 }
 
-function parseToolArguments(toolCall: ToolCall): Record<string, unknown> {
+export function parseToolCallArguments(toolCall: ToolCall): ParsedToolArguments {
+  const raw = toolCall.function.arguments ?? '';
+  if (!raw.trim()) {
+    return { ok: true, args: {} };
+  }
+
   try {
-    const parsed = JSON.parse(toolCall.function.arguments || '{}');
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    return parsed as Record<string, unknown>;
-  } catch {
-    return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {
+        ok: false,
+        error: formatToolInputError(toolCall.function.name, 'arguments must be a JSON object'),
+      };
+    }
+    return { ok: true, args: parsed as Record<string, unknown> };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'invalid JSON';
+    return {
+      ok: false,
+      error: formatToolInputError(toolCall.function.name, `malformed JSON arguments: ${detail}`),
+    };
   }
 }
 
@@ -85,7 +103,25 @@ async function runAllowedTool(name: string, args: Record<string, unknown>, works
 
 export async function executeToolCall(input: ExecuteToolCallInput): Promise<ExecuteToolCallResult> {
   const name = input.toolCall.function.name;
-  const args = parseToolArguments(input.toolCall);
+  const parsedArgs = parseToolCallArguments(input.toolCall);
+
+  if (!parsedArgs.ok) {
+    return {
+      permission: { decision: 'deny', reason: 'malformed tool arguments' },
+      permissionRequired: false,
+      message: toolMessage(input.toolCall, parsedArgs.error),
+    };
+  }
+
+  if (!isKnownTool(name)) {
+    return {
+      permission: { decision: 'deny', reason: 'unknown tool' },
+      permissionRequired: false,
+      message: toolMessage(input.toolCall, `Tool denied: unknown tool ${name}`),
+    };
+  }
+
+  const args = parsedArgs.args;
   let permission: PermissionDecision;
   try {
     const tool = getToolDefinition(name);

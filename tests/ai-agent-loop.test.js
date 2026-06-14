@@ -167,3 +167,78 @@ test('agent loop turns exit_plan_mode into a plan approval request', async () =>
   assert.deepEqual(result.permissions, [{ action: 'edit files', reason: 'implement plan' }]);
   assert.equal(messages.at(-1).tool_calls[0].function.name, 'exit_plan_mode');
 });
+
+test('agent loop executes multiple tool calls in order with one result each', async () => {
+  const { runAgentTurn } = require('../dist/chat/agent/loop');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-agent-loop-multi-'));
+  fs.writeFileSync(path.join(workspaceRoot, 'note.txt'), 'ordered 中文', 'utf8');
+
+  const messages = [{ role: 'user', content: 'inspect workspace' }];
+  const result = await runAgentTurn({
+    messages,
+    workspaceRoot,
+    mode: 'agent',
+    permissionMode: 'bypass',
+    complete: async (nextMessages) => {
+      const toolMessages = nextMessages.filter((message) => message.role === 'tool');
+      if (toolMessages.length === 0) {
+        return {
+          role: 'assistant',
+          content: '',
+          tool_calls: [
+            toolCall('call-1', 'read_file', { path: 'note.txt' }),
+            toolCall('call-2', 'list_files', { path: '.' }),
+          ],
+        };
+      }
+
+      assert.deepEqual(toolMessages.map((message) => message.tool_call_id), ['call-1', 'call-2']);
+      assert.match(toolMessages[0].content, /ordered 中文/);
+      assert.match(toolMessages[1].content, /note\.txt/);
+      return { role: 'assistant', content: 'Both tools completed in order.' };
+    },
+  });
+
+  assert.equal(result.status, 'completed');
+  assert.equal(result.toolResults.length, 2);
+  assert.deepEqual(result.toolResults.map((entry) => entry.toolCall.id), ['call-1', 'call-2']);
+  assert.equal(result.finalMessage.content, 'Both tools completed in order.');
+});
+
+test('agent loop stops after max tool rounds with a clear assistant message', async () => {
+  const { runAgentTurn } = require('../dist/chat/agent/loop');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-agent-loop-max-rounds-'));
+  let rounds = 0;
+
+  const result = await runAgentTurn({
+    messages: [{ role: 'user', content: 'keep calling tools' }],
+    workspaceRoot,
+    mode: 'agent',
+    permissionMode: 'bypass',
+    maxToolRounds: 2,
+    complete: async () => {
+      rounds += 1;
+      return {
+        role: 'assistant',
+        content: '',
+        tool_calls: [toolCall(`call-${rounds}`, 'list_files', { path: '.' })],
+      };
+    },
+  });
+
+  assert.equal(result.status, 'completed');
+  assert.equal(rounds, 2);
+  assert.match(result.finalMessage.content, /Stopped after 2 tool rounds/i);
+  assert.equal(result.toolResults.length, 2);
+});
+
+function toolCall(id, name, args) {
+  return {
+    id,
+    type: 'function',
+    function: {
+      name,
+      arguments: JSON.stringify(args),
+    },
+  };
+}

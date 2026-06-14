@@ -1,7 +1,7 @@
 import { ChatMessage, ToolCall } from '../../types';
 import { PermissionDecision, SessionPermissionMemory } from '../permissions/engine';
 import { AiMode, PermissionMode } from '../session';
-import { executeToolCall, ExecuteToolCallResult } from '../tools/runner';
+import { executeToolCall, ExecuteToolCallResult, parseToolCallArguments } from '../tools/runner';
 
 export interface RunAgentTurnInput {
   messages: ChatMessage[];
@@ -48,16 +48,6 @@ export type RunAgentTurnResult =
       toolResults: AgentToolResult[];
     };
 
-function parseToolArguments(toolCall: ToolCall): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(toolCall.function.arguments || '{}');
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    return parsed as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
 function parsePlanPermissions(value: unknown): PlanPermissionRequest[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -67,6 +57,17 @@ function parsePlanPermissions(value: unknown): PlanPermissionRequest[] {
       reason: typeof item.reason === 'string' ? item.reason : undefined,
     }))
     .filter((item) => item.action.trim());
+}
+
+function pushToolResult(
+  input: RunAgentTurnInput,
+  toolResults: AgentToolResult[],
+  toolCall: ToolCall,
+  message: ChatMessage,
+  permission: PermissionDecision,
+): void {
+  input.messages.push(message);
+  toolResults.push({ toolCall, message, permission });
 }
 
 export async function runAgentTurn(input: RunAgentTurnInput): Promise<RunAgentTurnResult> {
@@ -84,7 +85,17 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<RunAgentTu
 
     for (const toolCall of toolCalls) {
       if (toolCall.function.name === 'exit_plan_mode' && input.mode === 'plan') {
-        const args = parseToolArguments(toolCall);
+        const parsed = parseToolCallArguments(toolCall);
+        if (!parsed.ok) {
+          pushToolResult(input, toolResults, toolCall, {
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: parsed.error,
+          }, { decision: 'deny', reason: 'malformed tool arguments' });
+          continue;
+        }
+
+        const args = parsed.args;
         return {
           status: 'plan_approval_required',
           pendingToolCall: toolCall,
@@ -97,12 +108,7 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<RunAgentTu
 
       if (toolCall.function.name === 'task' && input.mode === 'agent' && input.handleAgentTool) {
         const message = await input.handleAgentTool(toolCall);
-        input.messages.push(message);
-        toolResults.push({
-          toolCall,
-          message,
-          permission: { decision: 'allow', reason: 'agent task delegation' },
-        });
+        pushToolResult(input, toolResults, toolCall, message, { decision: 'allow', reason: 'agent task delegation' });
         continue;
       }
 
@@ -125,12 +131,7 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<RunAgentTu
         };
       }
 
-      input.messages.push(result.message);
-      toolResults.push({
-        toolCall,
-        message: result.message,
-        permission: result.permission,
-      });
+      pushToolResult(input, toolResults, toolCall, result.message, result.permission);
     }
   }
 

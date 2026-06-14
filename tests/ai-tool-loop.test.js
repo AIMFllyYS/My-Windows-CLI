@@ -130,3 +130,60 @@ test('exit plan mode schema carries plan and permission categories', () => {
   assert.equal(exitPlan.function.parameters.properties.plan.type, 'string');
   assert.equal(exitPlan.function.parameters.properties.permissions.type, 'array');
 });
+
+test('tool call runner returns structured error for malformed JSON arguments', async () => {
+  const { executeToolCall } = require('../dist/chat/tools/runner');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-tool-runner-malformed-'));
+
+  const result = await executeToolCall({
+    toolCall: {
+      id: 'call-bad-json',
+      type: 'function',
+      function: { name: 'read_file', arguments: '{not json' },
+    },
+    mode: 'chat',
+    permissionMode: 'ask',
+    workspaceRoot,
+  });
+
+  assert.equal(result.permission.decision, 'deny');
+  assert.equal(result.permissionRequired, false);
+  assert.equal(result.message.role, 'tool');
+  assert.equal(result.message.tool_call_id, 'call-bad-json');
+  assert.match(result.message.content, /Tool error \(read_file\).*malformed JSON/i);
+});
+
+test('tool call runner denies unknown tools with structured error', async () => {
+  const { executeToolCall } = require('../dist/chat/tools/runner');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-tool-runner-unknown-'));
+
+  const result = await executeToolCall({
+    toolCall: toolCall('call-unknown', 'telemetry_upload', {}),
+    mode: 'agent',
+    permissionMode: 'bypass',
+    workspaceRoot,
+  });
+
+  assert.equal(result.permission.decision, 'deny');
+  assert.equal(result.permissionRequired, false);
+  assert.equal(result.message.tool_call_id, 'call-unknown');
+  assert.match(result.message.content, /Tool denied: unknown tool telemetry_upload/i);
+});
+
+test('provider attaches tools for custom OpenAI-compatible providers', () => {
+  const { shouldAttachProviderTools } = require('../dist/chat/provider');
+  const tools = [{ type: 'function', function: { name: 'read_file' } }];
+  const customProvider = {
+    name: 'custom',
+    protocol: 'https:',
+    hostname: 'example.com',
+    path: '/v1/chat/completions',
+    key: 'key',
+    modelId: 'local-model',
+  };
+
+  assert.equal(shouldAttachProviderTools({ id: 'local-model', provider: 'custom' }, customProvider, tools), true);
+  assert.equal(shouldAttachProviderTools({ id: 'glm-4', provider: 'zhipu' }, { ...customProvider, name: 'zhipu' }, tools), true);
+  assert.equal(shouldAttachProviderTools({ id: 'deepseek-chat', provider: 'deepseek' }, { ...customProvider, name: 'deepseek' }, tools), false);
+  assert.equal(shouldAttachProviderTools({ id: 'local-model', provider: 'custom' }, customProvider, []), false);
+});
