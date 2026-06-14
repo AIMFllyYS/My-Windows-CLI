@@ -4,6 +4,16 @@
 
 ---
 
+## v0.6.15 (2026-06-14)
+
+**ci(desktop): GitHub Release 工作流与桌面安装包验证**
+
+- 新增 Windows/macOS 双平台 desktop release workflow
+- GitHub Release 事件自动附加 `.exe`、`.dmg`、`.zip` 与更新元数据
+- `workflow_dispatch` 仍上传 Actions artifact，便于手动下载验证
+- Desktop 设置面板读取 latest release 资产并通过 allowlist 安全打开下载链接
+- 打包前复制 CLI runtime 并安装生产依赖，确保 Electron 安装包内置可运行 CLI
+
 ## v0.6.3 (2026-04-27)
 
 **fix: 修复 AI Chat 多个核心 Bug**
