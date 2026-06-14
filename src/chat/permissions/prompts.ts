@@ -1,7 +1,8 @@
-import { PermissionDecision, rememberSessionPermissionRule, resolveWorkspacePath, SessionPermissionMemory, SessionPermissionRule } from './engine';
+import { PermissionDecision, recordDenial, rememberSessionPermissionRule, resolveWorkspacePath, SessionPermissionMemory, SessionPermissionRule } from './engine';
 import { RunAgentTurnInput, RunAgentTurnResult, runAgentTurn } from '../agent/loop';
 import { executeToolCall } from '../tools/runner';
-import { renderPermissionBox } from '../ui/layout';
+import { renderPermissionBox, renderRecentDenials } from '../ui/layout';
+import { getRecentDenials } from './engine';
 
 export type PermissionPromptChoice =
   | { kind: 'allow_once' }
@@ -54,6 +55,11 @@ export function formatPermissionPromptOptions(): string {
     '  4) Deny with feedback',
     '  5) Cancel',
   ].join('\n');
+}
+
+export function formatRecentDenials(session?: SessionPermissionMemory): string {
+  const denials = getRecentDenials(session);
+  return renderRecentDenials({ denials });
 }
 
 function parseToolArguments(toolCall: Extract<RunAgentTurnResult, { status: 'permission_required' }>['pendingToolCall']): Record<string, unknown> {
@@ -115,6 +121,9 @@ export async function applyPermissionPromptChoice(input: {
       tool_call_id: input.pending.pendingToolCall.id,
       content: `Tool denied by user: ${toolName}. Feedback: ${feedback}`,
     };
+    if (input.session) {
+      recordDenial(input.session, { toolName, reason: `denied with feedback: ${feedback}`, input: parseToolArguments(input.pending.pendingToolCall) });
+    }
     input.messages.push(toolMessage);
     return runAgentTurn({
       messages: input.messages,
@@ -134,6 +143,9 @@ export async function applyPermissionPromptChoice(input: {
       tool_call_id: input.pending.pendingToolCall.id,
       content: `Tool denied by user: ${toolName}`,
     };
+    if (input.session) {
+      recordDenial(input.session, { toolName, reason: 'denied by user', input: parseToolArguments(input.pending.pendingToolCall) });
+    }
     input.messages.push(toolMessage);
     return { status: 'denied', toolMessage };
   }

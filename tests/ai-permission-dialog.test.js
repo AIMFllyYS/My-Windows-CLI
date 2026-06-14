@@ -196,3 +196,73 @@ test('cancel stops the permission request without executing or resuming', async 
   assert.equal(completionCount, 0);
   assert.equal(fs.existsSync(path.join(workspaceRoot, 'out.txt')), false);
 });
+
+test('deny records a recent denial and formatRecentDenials renders it', async () => {
+  const { applyPermissionPromptChoice, formatRecentDenials } = require('../dist/chat/permissions/prompts');
+  const { getRecentDenials } = require('../dist/chat/permissions/engine');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-permission-recent-'));
+  const session = {};
+
+  await applyPermissionPromptChoice({
+    choice: { kind: 'deny' },
+    pending: {
+      status: 'permission_required',
+      pendingToolCall: writeCall('recent-deny-call'),
+      permission: { decision: 'ask', reason: 'agent mode requires confirmation' },
+      assistantMessage: { role: 'assistant', content: '', tool_calls: [writeCall('recent-deny-call')] },
+      toolMessage: { role: 'tool', tool_call_id: 'recent-deny-call', content: 'Permission required' },
+      toolResults: [],
+    },
+    messages: [{ role: 'assistant', content: '', tool_calls: [writeCall('recent-deny-call')] }],
+    workspaceRoot,
+    mode: 'agent',
+    permissionMode: 'ask',
+    session,
+    complete: async () => ({ role: 'assistant', content: 'Denied.' }),
+  });
+
+  const denials = getRecentDenials(session);
+  assert.equal(denials.length, 1);
+  assert.equal(denials[0].toolName, 'write_file');
+  assert.match(denials[0].reason, /denied by user/);
+  assert.ok(denials[0].timestamp > 0);
+
+  const rendered = formatRecentDenials(session);
+  assert.match(rendered, /Recent Denials/);
+  assert.match(rendered, /write_file/);
+});
+
+test('deny_feedback records a recent denial with feedback text', async () => {
+  const { applyPermissionPromptChoice } = require('../dist/chat/permissions/prompts');
+  const { getRecentDenials } = require('../dist/chat/permissions/engine');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-permission-recent-fb-'));
+  const session = {};
+
+  await applyPermissionPromptChoice({
+    choice: { kind: 'deny_feedback', feedback: 'Not safe to proceed.' },
+    pending: {
+      status: 'permission_required',
+      pendingToolCall: writeCall('recent-fb-call'),
+      permission: { decision: 'ask', reason: 'agent mode requires confirmation' },
+      assistantMessage: { role: 'assistant', content: '', tool_calls: [writeCall('recent-fb-call')] },
+      toolMessage: { role: 'tool', tool_call_id: 'recent-fb-call', content: 'Permission required' },
+      toolResults: [],
+    },
+    messages: [{ role: 'assistant', content: '', tool_calls: [writeCall('recent-fb-call')] }],
+    workspaceRoot,
+    mode: 'agent',
+    permissionMode: 'ask',
+    session,
+    complete: async () => ({ role: 'assistant', content: 'Acknowledged.' }),
+  });
+
+  const denials = getRecentDenials(session);
+  assert.equal(denials.length, 1);
+  assert.match(denials[0].reason, /Not safe to proceed/);
+});
+
+test('formatRecentDenials returns empty string when no denials exist', () => {
+  const { formatRecentDenials } = require('../dist/chat/permissions/prompts');
+  assert.equal(formatRecentDenials({}), '');
+  assert.equal(formatRecentDenials(undefined), '');
+});

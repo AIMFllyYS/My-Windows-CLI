@@ -213,3 +213,28 @@ test('session permission rules are scoped to path or command prefix', () => {
     session,
   })).decision, 'ask');
 });
+
+test('recordDenial stores denials and getRecentDenials retrieves them', () => {
+  const { recordDenial, getRecentDenials } = require('../dist/chat/permissions/engine');
+  const session = {};
+  recordDenial(session, { toolName: 'shell', reason: 'denied by user' });
+  recordDenial(session, { toolName: 'write_file', reason: 'denied: path outside workspace' });
+
+  const denials = getRecentDenials(session);
+  assert.equal(denials.length, 2);
+  assert.equal(denials[0].toolName, 'shell');
+  assert.equal(denials[1].toolName, 'write_file');
+  assert.ok(denials[0].timestamp > 0);
+});
+
+test('getRecentDenials limits results and handles empty session', () => {
+  const { recordDenial, getRecentDenials } = require('../dist/chat/permissions/engine');
+  const session = {};
+  for (let i = 0; i < 15; i++) {
+    recordDenial(session, { toolName: `tool_${i}`, reason: 'denied' });
+  }
+  assert.equal(getRecentDenials(session).length, 10);
+  assert.equal(getRecentDenials(session, 3).length, 3);
+  assert.deepEqual(getRecentDenials(undefined), []);
+  assert.deepEqual(getRecentDenials({}), []);
+});

@@ -10,11 +10,19 @@ export interface PermissionDecision {
   reason: string;
 }
 
+export interface RecentDenial {
+  toolName: string;
+  reason: string;
+  timestamp: number;
+  input?: Record<string, unknown>;
+}
+
 export interface SessionPermissionMemory {
   allowedTools?: Set<string>;
   deniedTools?: Set<string>;
   allowedRules?: SessionPermissionRule[];
   deniedRules?: SessionPermissionRule[];
+  recentDenials?: RecentDenial[];
 }
 
 export interface SessionPermissionRule {
@@ -100,6 +108,24 @@ export function rememberSessionDecision(
   }
   state.deniedTools ||= new Set<string>();
   state.deniedTools.add(decision.toolName);
+}
+
+export function recordDenial(
+  state: SessionPermissionMemory,
+  denial: { toolName: string; reason: string; input?: Record<string, unknown> }
+): void {
+  state.recentDenials ||= [];
+  state.recentDenials.push({
+    toolName: denial.toolName,
+    reason: denial.reason,
+    timestamp: Date.now(),
+    input: denial.input,
+  });
+}
+
+export function getRecentDenials(state: SessionPermissionMemory | undefined, limit = 10): RecentDenial[] {
+  if (!state?.recentDenials) return [];
+  return state.recentDenials.slice(-limit);
 }
 
 export function rememberSessionPermissionRule(

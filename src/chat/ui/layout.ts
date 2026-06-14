@@ -2,6 +2,11 @@ import { AiMode, PermissionMode } from '../session';
 import { getModeConfig } from '../modes';
 import { glyphs } from '../terminal-ui';
 import { line, truncateVisible, ui, UI_WIDTH, visibleLength } from './theme';
+import type { RecentDenial } from '../permissions/engine';
+
+export interface RecentDenialsInput {
+  denials: RecentDenial[];
+}
 
 export interface StatusHeaderInput {
   project: string;
@@ -127,6 +132,16 @@ export function renderTimelineEntry(input: TimelineEntryInput): string {
   const maxDetailWidth = Math.max(0, maxLineWidth - visibleLength(plainPrefix) - 3);
   const detail = input.detail && maxDetailWidth > 0 ? ui.muted(` - ${truncateVisible(input.detail, maxDetailWidth)}`) : '';
   return `  ${ui.muted(icon)} ${ui.strong(labelText)} ${status}${detail}`;
+}
+
+export function renderRecentDenials(input: RecentDenialsInput): string {
+  if (!input.denials.length) return '';
+  const header = `  ${ui.warning('Recent Denials')}`;
+  const items = input.denials.slice(-5).map((d) => {
+    const label = truncateVisible(`${d.toolName}: ${d.reason}`, 56);
+    return `  ${ui.danger(glyphs.bullet)} ${ui.muted(label)}`;
+  });
+  return ['', header, `  ${line(48)}`, ...items].join('\n');
 }
 
 export function renderKeyboardHintRow(): string {
