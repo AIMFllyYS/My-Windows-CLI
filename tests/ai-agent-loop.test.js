@@ -301,6 +301,33 @@ test('agent loop stops after max tool rounds with a clear assistant message', as
   assert.equal(result.toolResults.length, 2);
 });
 
+test('agent loop stops between tool rounds when abort signal is triggered', async () => {
+  const { runAgentTurn } = require('../dist/chat/agent/loop');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-agent-loop-abort-'));
+  const abort = new AbortController();
+  let rounds = 0;
+
+  const resultPromise = runAgentTurn({
+    messages: [{ role: 'user', content: 'keep going' }],
+    workspaceRoot,
+    mode: 'agent',
+    permissionMode: 'bypass',
+    abortSignal: abort.signal,
+    complete: async () => {
+      rounds += 1;
+      if (rounds === 1) abort.abort();
+      return {
+        role: 'assistant',
+        content: '',
+        tool_calls: [toolCall('call-abort', 'list_files', { path: '.' })],
+      };
+    },
+  });
+
+  await assert.rejects(resultPromise, (error) => error.name === 'AbortError');
+  assert.equal(rounds, 1);
+});
+
 function toolCall(id, name, args) {
   return {
     id,

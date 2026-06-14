@@ -106,6 +106,54 @@ test('timeline entries render tool and subagent activity', () => {
   assert.match(subagent, /running/);
 });
 
+test('subagent timeline entry renders queued completed failed and cancelled rows with metrics', () => {
+  const { renderSubagentTimelineEntry } = require('../dist/chat/ui/layout');
+
+  const queued = stripAnsi(renderSubagentTimelineEntry({
+    id: 'sub-1',
+    status: 'queued',
+    prompt: 'Review files',
+  }));
+  const running = stripAnsi(renderSubagentTimelineEntry({
+    id: 'sub-2',
+    status: 'running',
+    prompt: 'Inspect auth',
+  }));
+  const completed = stripAnsi(renderSubagentTimelineEntry({
+    id: 'sub-3',
+    status: 'completed',
+    prompt: 'Verify renderer',
+    summary: 'Done',
+    toolCount: 2,
+    permissionCount: 1,
+    elapsedMs: 1200,
+  }));
+  const failed = stripAnsi(renderSubagentTimelineEntry({
+    id: 'sub-4',
+    status: 'failed',
+    prompt: 'Broken task',
+    error: 'Permission denied',
+  }));
+  const cancelled = stripAnsi(renderSubagentTimelineEntry({
+    id: 'sub-5',
+    status: 'cancelled',
+    prompt: 'Stopped task',
+    summary: 'Stopped early',
+  }));
+
+  assert.match(queued, /sub-1/);
+  assert.match(queued, /queued/);
+  assert.match(running, /running/);
+  assert.match(completed, /completed/);
+  assert.match(completed, /tools=2/);
+  assert.match(completed, /permissions=1/);
+  assert.match(completed, /1200ms/);
+  assert.match(failed, /failed/);
+  assert.match(failed, /Permission denied/);
+  assert.match(cancelled, /cancelled/);
+  assert.match(cancelled, /Stopped early/);
+});
+
 test('timeline truncation does not cut ANSI escape sequences', () => {
   const chalk = require('chalk');
   const previous = chalk.level;

@@ -11,6 +11,7 @@ export interface RunAgentTurnInput {
   permissionMode: PermissionMode;
   session?: SessionPermissionMemory;
   maxToolRounds?: number;
+  abortSignal?: AbortSignal;
   complete: (messages: ChatMessage[]) => Promise<ChatMessage> | ChatMessage;
   handleAgentTool?: (toolCall: ToolCall) => Promise<ChatMessage> | ChatMessage;
 }
@@ -82,12 +83,21 @@ function pushToolResult(
   toolResults.push({ toolCall, message, permission });
 }
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  const error = new Error('Subagent cancelled');
+  error.name = 'AbortError';
+  throw error;
+}
+
 export async function runAgentTurn(input: RunAgentTurnInput): Promise<RunAgentTurnResult> {
   const toolResults: AgentToolResult[] = [];
   const maxToolRounds = input.maxToolRounds ?? 8;
 
   for (let round = 0; round < maxToolRounds; round += 1) {
+    throwIfAborted(input.abortSignal);
     const assistantMessage = await input.complete(input.messages);
+    throwIfAborted(input.abortSignal);
     input.messages.push(assistantMessage);
 
     const toolCalls = assistantMessage.tool_calls || [];
@@ -96,6 +106,7 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<RunAgentTu
     }
 
     for (const toolCall of toolCalls) {
+      throwIfAborted(input.abortSignal);
       if (toolCall.function.name === 'exit_plan_mode') {
         if (input.mode !== 'plan') {
           pushToolResult(input, toolResults, toolCall, {

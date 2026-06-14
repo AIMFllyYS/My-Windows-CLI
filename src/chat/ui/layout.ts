@@ -49,6 +49,17 @@ export interface TimelineEntryInput {
   detail?: string;
 }
 
+export interface SubagentTimelineInput {
+  id: string;
+  status: TimelineEntryInput['status'];
+  prompt: string;
+  summary?: string;
+  toolCount?: number;
+  permissionCount?: number;
+  elapsedMs?: number;
+  error?: string;
+}
+
 export function renderModePill(mode: AiMode, permissionMode: PermissionMode): string {
   const config = getModeConfig(mode);
   const label = `[${config.symbol} ${config.shortTitle}]`;
@@ -143,6 +154,36 @@ export function renderTimelineEntry(input: TimelineEntryInput): string {
   const maxDetailWidth = Math.max(0, maxLineWidth - visibleLength(plainPrefix) - 3);
   const detail = input.detail && maxDetailWidth > 0 ? ui.muted(` - ${truncateVisible(input.detail, maxDetailWidth)}`) : '';
   return `  ${ui.muted(icon)} ${ui.strong(labelText)} ${status}${detail}`;
+}
+
+function formatSubagentTimelineDetail(input: SubagentTimelineInput): string {
+  if (input.status === 'failed') {
+    return input.error || input.prompt;
+  }
+  if (input.status === 'cancelled') {
+    return formatSubagentMetrics(input.summary || input.prompt, input);
+  }
+  if (input.summary) {
+    return formatSubagentMetrics(input.summary, input);
+  }
+  return input.prompt;
+}
+
+function formatSubagentMetrics(summary: string, input: SubagentTimelineInput): string {
+  const parts = [summary];
+  if (input.toolCount != null) parts.push(`tools=${input.toolCount}`);
+  if (input.permissionCount != null) parts.push(`permissions=${input.permissionCount}`);
+  if (input.elapsedMs != null) parts.push(`${input.elapsedMs}ms`);
+  return parts.join(' · ');
+}
+
+export function renderSubagentTimelineEntry(input: SubagentTimelineInput): string {
+  return renderTimelineEntry({
+    kind: 'subagent',
+    status: input.status,
+    label: input.id,
+    detail: formatSubagentTimelineDetail(input),
+  });
 }
 
 export function renderRecentDenials(input: RecentDenialsInput): string {

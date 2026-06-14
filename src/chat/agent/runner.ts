@@ -52,8 +52,16 @@ function defaultAiComplete(tools: ProviderToolSpec[]): AiSubagentComplete {
   };
 }
 
-export function createAiSubagentHandler(options: AiSubagentHandlerOptions): (task: SubagentTask) => Promise<SubagentResult> {
-  return async (task) => {
+function countPermissionPrompts(toolResults: Array<{ permission: { decision: string } }>): number {
+  return toolResults.filter((entry) => entry.permission.decision === 'ask').length;
+}
+
+export function createAiSubagentHandler(options: AiSubagentHandlerOptions): (
+  task: SubagentTask,
+  context?: { signal?: AbortSignal }
+) => Promise<SubagentResult> {
+  return async (task, context) => {
+    const startedAt = Date.now();
     const messages = buildSubagentMessages(task);
     const tools = buildScopedToolSpecs(task);
     const complete = options.complete || defaultAiComplete(tools);
@@ -64,8 +72,10 @@ export function createAiSubagentHandler(options: AiSubagentHandlerOptions): (tas
       permissionMode: task.permissionMode,
       session: options.session,
       maxToolRounds: options.maxToolRounds,
+      abortSignal: context?.signal,
       complete: (nextMessages) => complete(nextMessages, task, tools),
     });
+    const elapsedMs = Date.now() - startedAt;
 
     if (result.status === 'permission_required') {
       return {
@@ -75,6 +85,9 @@ export function createAiSubagentHandler(options: AiSubagentHandlerOptions): (tas
           `reason=${result.permission.reason}`,
           `toolResults=${result.toolResults.length}`,
         ],
+        toolCount: result.toolResults.length,
+        permissionCount: countPermissionPrompts(result.toolResults) + 1,
+        elapsedMs,
       };
     }
 
@@ -86,6 +99,9 @@ export function createAiSubagentHandler(options: AiSubagentHandlerOptions): (tas
           `permissions=${result.permissions.map((permission) => permission.action).join(',') || 'none'}`,
           `toolResults=${result.toolResults.length}`,
         ],
+        toolCount: result.toolResults.length,
+        permissionCount: countPermissionPrompts(result.toolResults) + result.permissions.length,
+        elapsedMs,
       };
     }
 
@@ -96,6 +112,9 @@ export function createAiSubagentHandler(options: AiSubagentHandlerOptions): (tas
         `permissionMode=${task.permissionMode}`,
         `toolResults=${result.toolResults.length}`,
       ],
+      toolCount: result.toolResults.length,
+      permissionCount: countPermissionPrompts(result.toolResults),
+      elapsedMs,
     };
   };
 }

@@ -402,5 +402,118 @@ test('agent spawn queue runs through AI subagent handler instead of placeholder 
   const source = require('node:fs').readFileSync('src/chat/index.ts', 'utf8');
 
   assert.match(source, /createAiSubagentHandler/);
-  assert.match(source, /runNextSubagent\(hooks\.subagents,\s*createAiSubagentHandler/);
+  assert.match(source, /runSubagentScheduler\(hooks\.subagents/);
+  assert.match(source, /createAiSubagentHandler/);
+});
+
+test('subagent queue defaults to concurrency one', () => {
+  const { createSubagentQueue, DEFAULT_SUBAGENT_CONCURRENCY } = require('../dist/chat/agent/subagents');
+  const queue = createSubagentQueue({ parentPermissionMode: 'ask' });
+
+  assert.equal(DEFAULT_SUBAGENT_CONCURRENCY, 1);
+  assert.equal(queue.concurrency, 1);
+});
+
+test('subagent scheduler runs queued tasks with configured concurrency', async () => {
+  const { createSubagentQueue, enqueueSubagent, runSubagentScheduler } = require('../dist/chat/agent/subagents');
+  const queue = createSubagentQueue({ parentPermissionMode: 'ask', concurrency: 2 });
+  enqueueSubagent(queue, { prompt: 'task-a' });
+  enqueueSubagent(queue, { prompt: 'task-b' });
+  enqueueSubagent(queue, { prompt: 'task-c' });
+
+  let peakRunning = 0;
+  const completed = await runSubagentScheduler(queue, async (task) => {
+    peakRunning = Math.max(peakRunning, queue.items.filter((item) => item.status === 'running').length);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return { summary: `done:${task.prompt}`, notes: [] };
+  });
+
+  assert.equal(peakRunning, 2);
+  assert.equal(completed.length, 3);
+  assert.deepEqual(completed.map((task) => task.status), ['completed', 'completed', 'completed']);
+});
+
+test('cancelSubagent aborts running handler through abort signal', async () => {
+  const { createSubagentQueue, enqueueSubagent, cancelSubagent, runNextSubagent } = require('../dist/chat/agent/subagents');
+  const queue = createSubagentQueue({ parentPermissionMode: 'ask' });
+  const task = enqueueSubagent(queue, { prompt: 'long running' });
+  let sawAbort = false;
+
+  const run = runNextSubagent(queue, async (_running, context) => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    cancelSubagent(queue, task.id, { partialResult: { summary: 'Stopped early', notes: [] } });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    sawAbort = Boolean(context?.signal?.aborted);
+    return { summary: 'should not finish', notes: [] };
+  });
+
+  const result = await run;
+
+  assert.equal(result.status, 'cancelled');
+  assert.equal(result.result.summary, 'Stopped early');
+  assert.equal(sawAbort, true);
+});
+
+test('formatSubagentActivityDetail includes summary tool permission and elapsed metrics', () => {
+  const { formatSubagentActivityDetail } = require('../dist/chat/agent/subagents');
+
+  const detail = formatSubagentActivityDetail({
+    id: 'sub-1',
+    status: 'completed',
+    prompt: 'Review files',
+    mode: 'agent',
+    permissionMode: 'ask',
+    allowedTools: [],
+    disallowedTools: [],
+    skillIds: [],
+    parentRecentMessages: [],
+    createdAt: Date.now(),
+    result: {
+      summary: 'Reviewed renderer',
+      notes: ['mode=agent'],
+      toolCount: 2,
+      permissionCount: 1,
+      elapsedMs: 1500,
+    },
+  });
+
+  assert.match(detail, /Reviewed renderer/);
+  assert.match(detail, /tools=2/);
+  assert.match(detail, /permissions=1/);
+  assert.match(detail, /1500ms/);
+});
+
+test('buildSubagentTimelineInput covers queued running failed and cancelled states', () => {
+  const { buildSubagentTimelineInput } = require('../dist/chat/agent/subagents');
+
+  const queued = buildSubagentTimelineInput({
+    id: 'sub-1',
+    status: 'queued',
+    prompt: 'queued task',
+    mode: 'agent',
+    permissionMode: 'ask',
+    allowedTools: [],
+    disallowedTools: [],
+    skillIds: [],
+    parentRecentMessages: [],
+    createdAt: Date.now(),
+  });
+
+  assert.equal(queued.id, 'sub-1');
+  assert.equal(queued.status, 'queued');
+  assert.equal(queued.prompt, 'queued task');
+
+  assert.match(buildSubagentTimelineInput({
+    id: 'sub-2',
+    status: 'failed',
+    prompt: 'broken task',
+    mode: 'agent',
+    permissionMode: 'ask',
+    allowedTools: [],
+    disallowedTools: [],
+    skillIds: [],
+    parentRecentMessages: [],
+    createdAt: Date.now(),
+    error: 'boom',
+  }).error, /boom/);
 });

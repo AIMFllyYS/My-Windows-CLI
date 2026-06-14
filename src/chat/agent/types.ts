@@ -21,6 +21,9 @@ export interface SubagentTaskInput {
 export interface SubagentResult {
   summary: string;
   notes: string[];
+  toolCount?: number;
+  permissionCount?: number;
+  elapsedMs?: number;
 }
 
 export interface SubagentTask extends Required<Pick<SubagentTaskInput, 'prompt'>> {
@@ -40,6 +43,8 @@ export interface SubagentTask extends Required<Pick<SubagentTaskInput, 'prompt'>
   createdAt: number;
   startedAt?: number;
   completedAt?: number;
+  cancelRequested?: boolean;
+  abortController?: AbortController;
   result?: SubagentResult;
   error?: string;
 }
@@ -48,4 +53,5 @@ export interface SubagentQueue {
   parentPermissionMode: PermissionMode;
   nextId: number;
   items: SubagentTask[];
+  concurrency: number;
 }

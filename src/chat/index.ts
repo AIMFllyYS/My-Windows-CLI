@@ -14,12 +14,12 @@ import { isGlobalInterruptKey } from './keybindings';
 import { getNextMode, preparePlanModeSession, resolveModeCommandAction, resolvePlanApprovalOutcome } from './modes';
 import { AiSessionState, createSessionState, formatCurrentPlan, loadCurrentPlanFromWorkspace, recordCurrentPlan, setCurrentModel, setMode } from './session';
 import { ActiveRuntimeSkill, discoverRuntimeSkills, formatSkillContextMessage, formatSkillList, loadRuntimeSkillContent, resolveSkillSelection, RuntimeSkill, trimMessagesPreservingSkillContext, upsertSkillContextMessage } from './skills';
-import { createSubagentQueue, enqueueSubagent, cancelSubagent, formatSubagentList, resolveAgentCommand, runNextSubagent, setSubagentParentPermission } from './agent/subagents';
-import { SubagentQueue } from './agent/types';
+import { createSubagentQueue, enqueueSubagent, cancelSubagent, formatSubagentList, resolveAgentCommand, runSubagentScheduler, setSubagentParentPermission, buildSubagentTimelineInput } from './agent/subagents';
+import { SubagentQueue, SubagentTask } from './agent/types';
 import { RunAgentTurnResult, runAgentTurn } from './agent/loop';
 import { resolveAgentDefinition } from './agent/definitions';
 import { createAiSubagentHandler } from './agent/runner';
-import { renderPermissionBox, renderPlanApprovalPanel, renderStatusHeader, renderTimelineEntry } from './ui/layout';
+import { renderPermissionBox, renderPlanApprovalPanel, renderStatusHeader, renderSubagentTimelineEntry, renderTimelineEntry } from './ui/layout';
 import { SessionPermissionMemory } from './permissions/engine';
 import { applyPermissionPromptChoice, formatPermissionDecision, formatPermissionPromptOptions, parsePermissionPromptChoice } from './permissions/prompts';
 import { buildProviderToolSpecs } from './tools/registry';
@@ -472,16 +472,7 @@ async function handleAgentCommand(
     }
     try {
       const cancelled = cancelSubagent(hooks.subagents, command.id);
-      if (cancelled.status === 'cancelled') {
-        console.log(renderTimelineEntry({
-          kind: 'subagent',
-          status: 'cancelled',
-          label: cancelled.id,
-          detail: cancelled.result?.summary || cancelled.prompt,
-        }));
-      } else {
-        console.log(renderTimelineEntry({ kind: 'subagent', status: cancelled.status, label: cancelled.id, detail: cancelled.prompt }));
-      }
+      console.log(renderSubagentTimelineEntry(buildSubagentTimelineInput(cancelled)));
     } catch (error: any) {
       printWarning(error.message);
     }
@@ -511,7 +502,7 @@ async function handleAgentCommand(
       decision: task.permissionMode === 'ask' ? 'ask' : 'allow',
       reason: `subagent runs in ${task.permissionMode} permission mode`,
     }, 'subagent'));
-    console.log(renderTimelineEntry({ kind: 'subagent', status: 'queued', label: task.id, detail: task.prompt }));
+    console.log(renderSubagentTimelineEntry(buildSubagentTimelineInput(task)));
     runSubagentQueueInBackground(hooks);
     return;
   }
@@ -530,28 +521,33 @@ function runSubagentQueueInBackground(hooks: RuntimeHooks): void {
   if (hooks.isSubagentWorkerActive()) return;
   hooks.setSubagentWorkerActive(true);
 
-  const loop = async (): Promise<void> => {
-    try {
-      while (hooks.subagents.items.some((item) => item.status === 'queued')) {
-        const next = hooks.subagents.items.find((item) => item.status === 'queued');
-        if (!next) break;
-        hooks.setSubagentActiveWork(() => {
+  const handler = createAiSubagentHandler({
+    workspaceRoot: process.cwd(),
+    session: hooks.permissionSession,
+  });
+  const wrappedHandler = async (task: SubagentTask, context?: { signal?: AbortSignal }) => {
+    console.log(renderSubagentTimelineEntry(buildSubagentTimelineInput({ ...task, status: 'running' })));
+    hooks.setSubagentActiveWork(() => {
+      hooks.subagents.items
+        .filter((item) => item.status === 'running')
+        .forEach((item) => {
           try {
-            cancelSubagent(hooks.subagents, next.id);
+            cancelSubagent(hooks.subagents, item.id);
           } catch {
             // The task may have completed between keypress and cancellation.
           }
         });
-        const completed = await runNextSubagent(hooks.subagents, createAiSubagentHandler({
-          workspaceRoot: process.cwd(),
-          session: hooks.permissionSession,
-        }));
-        console.log(renderTimelineEntry({
-          kind: 'subagent',
-          status: completed.status,
-          label: completed.id,
-          detail: completed.result?.summary || completed.error || completed.prompt,
-        }));
+    });
+    return handler(task, context);
+  };
+
+  const loop = async (): Promise<void> => {
+    try {
+      while (hooks.subagents.items.some((item) => item.status === 'queued')) {
+        const completedTasks = await runSubagentScheduler(hooks.subagents, wrappedHandler);
+        completedTasks.forEach((completed) => {
+          console.log(renderSubagentTimelineEntry(buildSubagentTimelineInput(completed)));
+        });
       }
     } finally {
       hooks.setSubagentActiveWork(null);
@@ -827,12 +823,7 @@ function handleAgentTaskToolCall(
     agentType: agentDefinition.agentType,
     agentSystemPrompt: agentDefinition.systemPrompt,
   });
-  console.log(renderTimelineEntry({
-    kind: 'subagent',
-    status: 'queued',
-    label: task.id,
-    detail: args.description || args.prompt,
-  }));
+  console.log(renderSubagentTimelineEntry(buildSubagentTimelineInput(task)));
   runSubagentQueueInBackground(hooks);
 
   return {
