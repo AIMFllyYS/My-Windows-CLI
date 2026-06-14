@@ -16,6 +16,7 @@ import { ActiveRuntimeSkill, discoverRuntimeSkills, formatSkillContextMessage, f
 import { createSubagentQueue, enqueueSubagent, cancelSubagent, formatSubagentList, resolveAgentCommand, runNextSubagent, setSubagentParentPermission } from './agent/subagents';
 import { SubagentQueue } from './agent/types';
 import { runAgentTurn } from './agent/loop';
+import { resolveAgentDefinition } from './agent/definitions';
 import { createAiSubagentHandler } from './agent/runner';
 import { renderPermissionBox, renderStatusHeader, renderTimelineEntry } from './ui/layout';
 import { SessionPermissionMemory } from './permissions/engine';
@@ -471,13 +472,18 @@ async function handleAgentCommand(
       printWarning('用法: /agent spawn <任务>');
       return;
     }
+    const agentDefinition = resolveAgentDefinition(process.cwd(), 'general-purpose');
     const task = enqueueSubagent(hooks.subagents, {
       prompt: command.prompt,
       mode: session.mode === 'plan' ? 'plan' : 'agent',
       permissionMode: session.permissionMode,
-      skillIds: session.activeSkillIds,
+      allowedTools: agentDefinition.tools,
+      disallowedTools: agentDefinition.disallowedTools,
+      skillIds: [...new Set([...session.activeSkillIds, ...(agentDefinition.skills || [])])],
       modelId: currentModel.id,
       currentPlan: session.currentPlan,
+      agentType: agentDefinition.agentType,
+      agentSystemPrompt: agentDefinition.systemPrompt,
     });
     console.log(formatPermissionDecision({
       decision: task.permissionMode === 'ask' ? 'ask' : 'allow',
@@ -784,13 +790,19 @@ function handleAgentTaskToolCall(
     };
   }
 
+  const agentDefinition = resolveAgentDefinition(process.cwd(), args.subagentType);
+  const permissionMode = agentDefinition.permissionMode || session.permissionMode;
   const task = enqueueSubagent(hooks.subagents, {
     prompt: args.prompt,
-    mode: 'agent',
-    permissionMode: session.permissionMode,
-    skillIds: session.activeSkillIds,
-    modelId: model.id,
+    mode: permissionMode === 'plan' ? 'plan' : 'agent',
+    permissionMode,
+    allowedTools: agentDefinition.tools,
+    disallowedTools: agentDefinition.disallowedTools,
+    skillIds: [...new Set([...session.activeSkillIds, ...(agentDefinition.skills || [])])],
+    modelId: agentDefinition.model && agentDefinition.model !== 'inherit' ? agentDefinition.model : model.id,
     currentPlan: session.currentPlan,
+    agentType: agentDefinition.agentType,
+    agentSystemPrompt: agentDefinition.systemPrompt,
   });
   console.log(renderTimelineEntry({
     kind: 'subagent',
@@ -803,7 +815,7 @@ function handleAgentTaskToolCall(
   return {
     role: 'tool',
     tool_call_id: toolCall.id,
-    content: `Subagent ${task.id} queued: ${args.description || args.prompt}\nsubagent_type=${args.subagentType}`,
+    content: `Subagent ${task.id} queued: ${args.description || args.prompt}\nsubagent_type=${agentDefinition.agentType}`,
   };
 }
 

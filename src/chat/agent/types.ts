@@ -7,9 +7,12 @@ export interface SubagentTaskInput {
   mode?: AiMode;
   permissionMode?: PermissionMode;
   allowedTools?: string[];
+  disallowedTools?: string[];
   skillIds?: string[];
   modelId?: string;
   currentPlan?: string;
+  agentType?: string;
+  agentSystemPrompt?: string;
 }
 
 export interface SubagentResult {
@@ -23,9 +26,12 @@ export interface SubagentTask extends Required<Pick<SubagentTaskInput, 'prompt'>
   mode: AiMode;
   permissionMode: PermissionMode;
   allowedTools: string[];
+  disallowedTools: string[];
   skillIds: string[];
   modelId?: string;
   currentPlan?: string;
+  agentType?: string;
+  agentSystemPrompt?: string;
   createdAt: number;
   startedAt?: number;
   completedAt?: number;

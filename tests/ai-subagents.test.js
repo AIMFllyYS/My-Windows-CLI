@@ -79,6 +79,63 @@ test('subagent message builder scopes task context without account telemetry beh
   assert.doesNotMatch(messages.map((message) => message.content).join('\n'), /login|logout|oauth|telemetry|analytics|anthropic account/i);
 });
 
+test('subagent message builder injects selected agent definition prompt', () => {
+  const { buildSubagentMessages } = require('../dist/chat/agent/prompt');
+
+  const messages = buildSubagentMessages({
+    prompt: 'Verify the desktop install panel',
+    mode: 'agent',
+    permissionMode: 'ask',
+    allowedTools: ['read_file'],
+    skillIds: [],
+    modelId: 'model-a',
+    currentPlan: '',
+    agentType: 'verification',
+    agentSystemPrompt: 'You are a verification specialist for 0-1 CLI. Do not modify project files.',
+  });
+
+  assert.match(messages[0].content, /agentType=verification/);
+  assert.match(messages[0].content, /Agent Definition/);
+  assert.match(messages[0].content, /verification specialist for 0-1 CLI/);
+  assert.doesNotMatch(messages[0].content, /Anthropic account|telemetry|oauth/i);
+});
+
+test('built-in and project agent definitions load without account telemetry behavior', () => {
+  const { listAgentDefinitions, resolveAgentDefinition } = require('../dist/chat/agent/definitions');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-agent-defs-'));
+  const agentDir = path.join(workspaceRoot, '.0-1-cli', 'agents');
+  fs.mkdirSync(agentDir, { recursive: true });
+  fs.writeFileSync(path.join(agentDir, 'reviewer.md'), [
+    '---',
+    'description: 代码审查 agent',
+    'tools: read_file,search_files',
+    'skills: test-driven-development',
+    'permissionMode: plan',
+    '---',
+    '请保留 UTF-8 中文，并只做只读审查。',
+    '',
+  ].join('\n'), 'utf8');
+
+  const agents = listAgentDefinitions(workspaceRoot);
+  const names = agents.map((agent) => agent.agentType);
+  assert.ok(names.includes('general-purpose'));
+  assert.ok(names.includes('plan'));
+  assert.ok(names.includes('verification'));
+  assert.ok(names.includes('reviewer'));
+
+  const plan = resolveAgentDefinition(workspaceRoot, 'plan');
+  assert.match(plan.systemPrompt, /READ-ONLY/i);
+  assert.deepEqual(plan.tools, ['list_files', 'read_file', 'search_files']);
+
+  const reviewer = resolveAgentDefinition(workspaceRoot, 'reviewer');
+  assert.equal(reviewer.whenToUse, '代码审查 agent');
+  assert.match(reviewer.systemPrompt, /UTF-8 中文/);
+  assert.equal(reviewer.permissionMode, 'plan');
+  assert.deepEqual(reviewer.skills, ['test-driven-development']);
+
+  assert.doesNotMatch(agents.map((agent) => agent.systemPrompt).join('\n'), /oauth|login|logout|telemetry|analytics|subscription|anthropic account/i);
+});
+
 test('AI subagent handler uses scoped prompt tool loop and allowed tool specs', async () => {
   const { createAiSubagentHandler } = require('../dist/chat/agent/runner');
   const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-ai-subagent-'));
@@ -125,6 +182,37 @@ test('AI subagent handler uses scoped prompt tool loop and allowed tool specs', 
   assert.match(calls[0].messages[0], /Goal: verify subagent execution/);
   assert.equal(calls[0].task.id, 'sub-1');
   assert.match(result.notes.join('\n'), /toolResults=1/);
+});
+
+test('AI subagent handler applies agent definition disallowed tools', async () => {
+  const { createAiSubagentHandler } = require('../dist/chat/agent/runner');
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hi-ai-subagent-deny-'));
+  const seenTools = [];
+
+  const handler = createAiSubagentHandler({
+    workspaceRoot,
+    complete: async (_messages, _runningTask, tools) => {
+      seenTools.push(...tools.map((tool) => tool.function.name));
+      return { role: 'assistant', content: 'done' };
+    },
+  });
+
+  await handler({
+    id: 'sub-deny',
+    status: 'running',
+    prompt: 'Check tools',
+    mode: 'agent',
+    permissionMode: 'ask',
+    allowedTools: ['*'],
+    disallowedTools: ['shell', 'write_file'],
+    skillIds: [],
+    createdAt: Date.now(),
+  });
+
+  assert.ok(seenTools.includes('read_file'));
+  assert.ok(seenTools.includes('task'));
+  assert.ok(!seenTools.includes('shell'));
+  assert.ok(!seenTools.includes('write_file'));
 });
 
 test('subagent permissions can narrow but not widen parent permissions', () => {

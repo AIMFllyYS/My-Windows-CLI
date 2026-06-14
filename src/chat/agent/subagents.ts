@@ -39,9 +39,12 @@ export function enqueueSubagent(queue: SubagentQueue, input: SubagentTaskInput):
     mode: input.mode || 'agent',
     permissionMode: narrowPermission(queue.parentPermissionMode, input.permissionMode),
     allowedTools: input.allowedTools || [],
+    disallowedTools: input.disallowedTools || [],
     skillIds: input.skillIds || [],
     modelId: input.modelId,
     currentPlan: input.currentPlan,
+    agentType: input.agentType,
+    agentSystemPrompt: input.agentSystemPrompt,
     createdAt: Date.now(),
   };
   queue.items.push(task);
@@ -118,8 +121,10 @@ function defaultSubagentHandler(task: SubagentTask): SubagentResult {
       `permissionMode=${task.permissionMode}`,
       task.modelId ? `modelId=${task.modelId}` : 'modelId=default',
       task.currentPlan ? `currentPlan=${task.currentPlan}` : 'currentPlan=none',
+      task.agentType ? `agentType=${task.agentType}` : 'agentType=general-purpose',
       task.skillIds.length ? `skillIds=${task.skillIds.join(',')}` : 'skillIds=none',
       task.allowedTools.length ? `allowedTools=${task.allowedTools.join(',')}` : 'allowedTools=none',
+      task.disallowedTools.length ? `disallowedTools=${task.disallowedTools.join(',')}` : 'disallowedTools=none',
     ],
   };
 }

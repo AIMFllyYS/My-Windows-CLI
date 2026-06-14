@@ -5,7 +5,7 @@ function formatList(label: string, values: string[] | undefined): string {
   return `${label}=${values && values.length ? values.join(',') : 'none'}`;
 }
 
-export function buildSubagentMessages(task: Pick<SubagentTask, 'prompt' | 'mode' | 'permissionMode' | 'allowedTools' | 'skillIds' | 'modelId' | 'currentPlan'>): ChatMessage[] {
+export function buildSubagentMessages(task: Pick<SubagentTask, 'prompt' | 'mode' | 'permissionMode' | 'allowedTools' | 'disallowedTools' | 'skillIds' | 'modelId' | 'currentPlan' | 'agentType' | 'agentSystemPrompt'>): ChatMessage[] {
   const system = [
     '# Subagent Runtime',
     'You are a scoped local subagent inside 0-1 CLI.',
@@ -16,11 +16,16 @@ export function buildSubagentMessages(task: Pick<SubagentTask, 'prompt' | 'mode'
     `mode=${task.mode}`,
     `permissionMode=${task.permissionMode}`,
     `modelId=${task.modelId || 'default'}`,
+    `agentType=${task.agentType || 'general-purpose'}`,
     formatList('allowedTools', task.allowedTools),
+    formatList('disallowedTools', task.disallowedTools),
     formatList('skillIds', task.skillIds),
     '',
     '# Current Plan',
     task.currentPlan?.trim() || 'none',
+    task.agentSystemPrompt?.trim()
+      ? ['', '# Agent Definition', task.agentSystemPrompt.trim()].join('\n')
+      : '',
   ].join('\n');
 
   return [

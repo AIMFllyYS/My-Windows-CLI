@@ -32,10 +32,17 @@ export function createLocalSubagentRunner(handler?: (task: SubagentTask) => Prom
 }
 
 function buildScopedToolSpecs(task: SubagentTask): ProviderToolSpec[] {
-  const tools = buildProviderToolSpecs(task.mode);
-  if (!task.allowedTools.length) return tools;
-  const allowed = new Set(task.allowedTools);
-  return tools.filter((tool) => allowed.has(tool.function.name));
+  let tools = buildProviderToolSpecs(task.mode);
+  if (task.allowedTools.length && !task.allowedTools.includes('*')) {
+    const allowed = new Set(task.allowedTools);
+    tools = tools.filter((tool) => allowed.has(tool.function.name));
+  }
+  const disallowedTools = task.disallowedTools || [];
+  if (disallowedTools.length) {
+    const disallowed = new Set(disallowedTools);
+    tools = tools.filter((tool) => !disallowed.has(tool.function.name));
+  }
+  return tools;
 }
 
 function defaultAiComplete(tools: ProviderToolSpec[]): AiSubagentComplete {
