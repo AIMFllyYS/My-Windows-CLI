@@ -9,8 +9,16 @@ function stripAnsi(value) {
   return value.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
 }
 
+function charVisibleWidth(char) {
+  const code = char.codePointAt(0) ?? 0;
+  if (code <= 0xff) return 1;
+  if (code >= 0x2500 && code <= 0x257f) return 1;
+  if (code === 0x25c6 || code === 0x25c7 || code === 0x2022) return 1;
+  return 2;
+}
+
 function visibleLength(value) {
-  return Array.from(stripAnsi(value)).reduce((sum, char) => sum + (/[\u0080-\uFFFF]/.test(char) ? 2 : 1), 0);
+  return Array.from(stripAnsi(value)).reduce((sum, char) => sum + charVisibleWidth(char), 0);
 }
 
 const REPLACEMENT = '\uFFFD';
@@ -156,7 +164,9 @@ test('subagent timeline entry renders queued completed failed and cancelled rows
 
 test('timeline truncation does not cut ANSI escape sequences', () => {
   const chalk = require('chalk');
-  const previous = chalk.level;
+  const { setColorEnabled } = require('../dist/chat/ui/theme');
+  const previousLevel = chalk.level;
+  setColorEnabled(true);
   chalk.level = 1;
   try {
     const { renderTimelineEntry } = require('../dist/chat/ui/layout');
@@ -170,7 +180,8 @@ test('timeline truncation does not cut ANSI escape sequences', () => {
     assert.doesNotMatch(output, /\x1B\[[0-?]*[ -/]*$/);
     assert.match(output, /\x1B\[/);
   } finally {
-    chalk.level = previous;
+    chalk.level = previousLevel;
+    setColorEnabled(!process.env.NO_COLOR);
   }
 });
 
@@ -325,4 +336,78 @@ test('keyboard hint row renders navigational shortcuts without exceeding status 
   assert.match(output, /Enter/);
   assert.match(output, /navigate/);
   assert.ok(visibleLength(output) <= 66, `hint row too wide: ${output}`);
+});
+
+test('theme divider and panels share divider glyph grammar', () => {
+  const { divider, panelDivider } = require('../dist/chat/ui/theme');
+  const { setGlyphMode } = require('../dist/chat/terminal-ui');
+
+  setGlyphMode('unicode');
+  assert.match(stripAnsi(divider(20)), /─{20}/);
+  assert.match(stripAnsi(panelDivider()), /─{48}/);
+
+  setGlyphMode('ascii');
+  assert.match(stripAnsi(divider(12)), /-{12}/);
+});
+
+test('renderByline joins keyboard hints with middot separator', () => {
+  const { renderByline, renderKeyboardHint } = require('../dist/chat/ui/theme');
+  const { setGlyphMode } = require('../dist/chat/terminal-ui');
+
+  setGlyphMode('unicode');
+  const output = stripAnsi(renderByline([
+    renderKeyboardHint('Enter', 'confirm', { bold: true }),
+    renderKeyboardHint('Esc', 'cancel'),
+  ]));
+
+  assert.match(output, /Enter to confirm · Esc to cancel/);
+});
+
+test('color disabled output stays readable without ANSI styling', () => {
+  const { setColorEnabled, divider } = require('../dist/chat/ui/theme');
+  const { renderPermissionBox, renderPlanApprovalPanel } = require('../dist/chat/ui/layout');
+
+  setColorEnabled(false);
+  try {
+    const permission = renderPermissionBox({
+      tool: 'read_file',
+      action: 'ask',
+      reason: 'agent mode requires confirmation',
+    });
+    const plan = renderPlanApprovalPanel({ plan: 'Goal: 保留 UTF-8 中文' });
+
+    assert.equal(permission.includes('\x1B['), false);
+    assert.equal(plan.includes('\x1B['), false);
+    assert.match(permission, /Permission/);
+    assert.match(permission, /read_file/);
+    assert.match(plan, /Ready to code\?/);
+    assert.match(plan, /保留 UTF-8 中文/);
+    assert.match(stripAnsi(divider(10)), /-{10}|─{10}/);
+  } finally {
+    setColorEnabled(true);
+  }
+});
+
+test('assistant answer header and markdown share divider grammar', () => {
+  const { renderAssistantHeader } = require('../dist/chat/ui/theme');
+  const { renderMarkdown } = require('../dist/chat/markdown');
+
+  const header = stripAnsi(renderAssistantHeader());
+  const markdown = stripAnsi(renderMarkdown('## Section\n\n---\n\nHello 中文'));
+
+  assert.match(header, /AI/);
+  assert.match(header, /─{10,}/);
+  assert.match(markdown, /─{10,}/);
+  assert.match(markdown, /Section/);
+  assert.match(markdown, /Hello 中文/);
+});
+
+test('spinner uses ascii-safe frames when glyph mode is ascii', () => {
+  const { Spinner } = require('../dist/chat/spinner');
+  const { setGlyphMode } = require('../dist/chat/terminal-ui');
+
+  setGlyphMode('ascii');
+  const frames = Spinner.getFrames();
+  assert.ok(frames.length >= 4);
+  assert.ok(frames.every((frame) => /^[\|/\\-]$/.test(frame)));
 });

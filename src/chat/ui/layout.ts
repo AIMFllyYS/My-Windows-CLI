@@ -1,7 +1,20 @@
 import { AiMode, PermissionMode } from '../session';
 import { getModeConfig } from '../modes';
 import { glyphs } from '../terminal-ui';
-import { line, truncateVisible, ui, UI_WIDTH, visibleLength } from './theme';
+import {
+  INDENT,
+  PANEL_WIDTH,
+  divider,
+  line,
+  panelDivider,
+  renderByline,
+  renderInputGuide,
+  renderKeyboardHint,
+  truncateVisible,
+  ui,
+  UI_WIDTH,
+  visibleLength,
+} from './theme';
 import type { RecentDenial } from '../permissions/engine';
 import type { FileChangeOperation } from '../tools/fs-write';
 
@@ -60,6 +73,10 @@ export interface SubagentTimelineInput {
   error?: string;
 }
 
+function renderPanelBody(lines: string[]): string[] {
+  return lines.map((entry) => `${INDENT}${entry}`);
+}
+
 export function renderModePill(mode: AiMode, permissionMode: PermissionMode): string {
   const config = getModeConfig(mode);
   const label = `[${config.symbol} ${config.shortTitle}]`;
@@ -86,9 +103,10 @@ export function renderStatusHeader(input: StatusHeaderInput): string {
 
   return [
     '',
-    `  ${truncateVisible(title, UI_WIDTH)}`,
-    `  ${ui.muted(truncateVisible(meta, UI_WIDTH))}`,
-    `  ${line(UI_WIDTH)}`,
+    `${INDENT}${truncateVisible(title, UI_WIDTH)}`,
+    `${INDENT}${ui.muted(truncateVisible(meta, UI_WIDTH))}`,
+    `${INDENT}${line(UI_WIDTH)}`,
+    renderKeyboardHintRow(),
   ].join('\n');
 }
 
@@ -96,11 +114,17 @@ export function renderPermissionBox(input: PermissionBoxInput): string {
   const actionColor = input.action === 'allow' ? ui.success : input.action === 'deny' ? ui.danger : ui.warning;
   return [
     '',
-    `  ${ui.warning('Permission')} ${actionColor(input.action.toUpperCase())}`,
-    `  ${line(48)}`,
-    `  tool   ${ui.strong(truncateVisible(input.tool, 40))}`,
-    `  reason ${ui.muted(truncateVisible(input.reason, 56))}`,
-    `  ${ui.success('[允许]')}  ${ui.danger('[拒绝]')}  ${ui.muted('[本次会话记住]')}`,
+    `${INDENT}${ui.warning('Permission')} ${actionColor(input.action.toUpperCase())}`,
+    `${INDENT}${panelDivider()}`,
+    ...renderPanelBody([
+      `tool   ${ui.strong(truncateVisible(input.tool, 40))}`,
+      `reason ${ui.muted(truncateVisible(input.reason, 56))}`,
+    ]),
+    `${INDENT}${renderByline([ui.success('[允许]'), ui.danger('[拒绝]'), ui.muted('[本次会话记住]')])}`,
+    `${INDENT}${renderInputGuide([
+      { shortcut: 'Enter', action: 'allow once', bold: true },
+      { shortcut: 'Esc', action: 'reject' },
+    ])}`,
   ].join('\n');
 }
 
@@ -110,32 +134,38 @@ export function renderPlanApprovalPanel(input: PlanApprovalPanelInput): string {
     : ['No plan content was provided.'];
   const output = [
     '',
-    `  ${ui.accent('Ready to code?')}`,
-    `  ${line(48)}`,
-    `  ${ui.strong("Here is 0-1 CLI's plan:")}`,
-    `  ${ui.muted('-'.repeat(48))}`,
-    ...planLines.map((planLine) => `  ${ui.muted('|')} ${truncateVisible(planLine, 58)}`),
-    `  ${ui.muted('-'.repeat(48))}`,
+    `${INDENT}${ui.accent('Ready to code?')}`,
+    `${INDENT}${panelDivider()}`,
+    ...renderPanelBody([
+      ui.strong("Here is 0-1 CLI's plan:"),
+      ui.muted(glyphs.divider.repeat(PANEL_WIDTH)),
+      ...planLines.map((planLine) => `${ui.muted('|')} ${truncateVisible(planLine, 58)}`),
+      ui.muted(glyphs.divider.repeat(PANEL_WIDTH)),
+    ]),
   ];
 
   if (input.planFilePath) {
-    output.push(`  ${ui.muted('Plan file:')} ${truncateVisible(input.planFilePath, 46)}`);
+    output.push(`${INDENT}${ui.muted('Plan file:')} ${truncateVisible(input.planFilePath, 46)}`);
   }
 
   const permissions = input.permissions || [];
   if (permissions.length) {
-    output.push(`  ${ui.strong('Requested permissions:')}`);
+    output.push(`${INDENT}${ui.strong('Requested permissions:')}`);
     permissions.forEach((permission) => {
       const detail = permission.reason ? `${permission.action}: ${permission.reason}` : permission.action;
-      output.push(`  ${ui.muted('-')} ${truncateVisible(detail, 58)}`);
+      output.push(`${INDENT}${ui.muted(glyphs.bullet)} ${truncateVisible(detail, 58)}`);
     });
-    output.push(`  ${ui.muted(truncateVisible('Permissions listed here are not auto-granted.', 62))}`);
+    output.push(`${INDENT}${ui.muted(truncateVisible('Permissions listed here are not auto-granted.', 62))}`);
   }
 
   output.push(
-    `  ${ui.muted('0-1 CLI has written up a plan and is ready to execute.')}`,
-    `  ${ui.success('[Y] Yes, manually approve edits')}  ${ui.danger('[N] No, keep planning')}`,
-    `  ${ui.muted(truncateVisible('Tip: edit the plan file first if you want changes before approval.', 62))}`
+    `${INDENT}${ui.muted('0-1 CLI has written up a plan and is ready to execute.')}`,
+    `${INDENT}${renderByline([ui.success('[Y] Yes, manually approve edits'), ui.danger('[N] No, keep planning')])}`,
+    `${INDENT}${ui.muted(truncateVisible('Tip: edit the plan file first if you want changes before approval.', 62))}`,
+    `${INDENT}${renderInputGuide([
+      { shortcut: 'Y', action: 'approve plan', bold: true },
+      { shortcut: 'N', action: 'keep planning' },
+    ])}`,
   );
 
   return output.join('\n');
@@ -149,11 +179,13 @@ export function renderTimelineEntry(input: TimelineEntryInput): string {
     : input.status === 'failed' || input.status === 'cancelled'
       ? ui.danger(input.status)
       : ui.warning(input.status);
-  const plainPrefix = `  ${icon} ${labelText} ${input.status}`;
-  const maxLineWidth = UI_WIDTH + 2;
+  const plainPrefix = `${INDENT}${icon} ${labelText} ${input.status}`;
+  const maxLineWidth = UI_WIDTH + INDENT.length;
   const maxDetailWidth = Math.max(0, maxLineWidth - visibleLength(plainPrefix) - 3);
-  const detail = input.detail && maxDetailWidth > 0 ? ui.muted(` - ${truncateVisible(input.detail, maxDetailWidth)}`) : '';
-  return `  ${ui.muted(icon)} ${ui.strong(labelText)} ${status}${detail}`;
+  const detail = input.detail && maxDetailWidth > 0
+    ? ui.muted(` - ${truncateVisible(input.detail, maxDetailWidth)}`)
+    : '';
+  return `${INDENT}${ui.muted(icon)} ${ui.strong(labelText)} ${status}${detail}`;
 }
 
 function formatSubagentTimelineDetail(input: SubagentTimelineInput): string {
@@ -174,7 +206,7 @@ function formatSubagentMetrics(summary: string, input: SubagentTimelineInput): s
   if (input.toolCount != null) parts.push(`tools=${input.toolCount}`);
   if (input.permissionCount != null) parts.push(`permissions=${input.permissionCount}`);
   if (input.elapsedMs != null) parts.push(`${input.elapsedMs}ms`);
-  return parts.join(' · ');
+  return parts.join(` ${glyphs.separator} `);
 }
 
 export function renderSubagentTimelineEntry(input: SubagentTimelineInput): string {
@@ -188,12 +220,12 @@ export function renderSubagentTimelineEntry(input: SubagentTimelineInput): strin
 
 export function renderRecentDenials(input: RecentDenialsInput): string {
   if (!input.denials.length) return '';
-  const header = `  ${ui.warning('Recent Denials')}`;
+  const header = `${INDENT}${ui.warning('Recent Denials')}`;
   const items = input.denials.slice(-5).map((d) => {
     const label = truncateVisible(`${d.toolName}: ${d.reason}`, 56);
-    return `  ${ui.danger(glyphs.bullet)} ${ui.muted(label)}`;
+    return `${INDENT}${ui.danger(glyphs.bullet)} ${ui.muted(label)}`;
   });
-  return ['', header, `  ${line(48)}`, ...items].join('\n');
+  return ['', header, `${INDENT}${panelDivider()}`, ...items].join('\n');
 }
 
 export function renderFileChangePreview(input: FileChangePreviewInput): string {
@@ -217,12 +249,18 @@ export function renderFileChangePreview(input: FileChangePreviewInput): string {
 
   return [
     '',
-    `  ${ui.warning('Permission')} ${opLabel}`,
-    `  ${line(48)}`,
-    `  tool   ${ui.strong(truncateVisible(input.tool, 40))}`,
-    `  file   ${ui.muted(truncateVisible(input.filePath, 56))}`,
-    `  lines  ${statsLine}`,
-    `  ${ui.success('[允许]')}  ${ui.danger('[拒绝]')}  ${ui.muted('[本次会话记住]')}`,
+    `${INDENT}${ui.warning('Permission')} ${opLabel}`,
+    `${INDENT}${panelDivider()}`,
+    ...renderPanelBody([
+      `tool   ${ui.strong(truncateVisible(input.tool, 40))}`,
+      `file   ${ui.muted(truncateVisible(input.filePath, 56))}`,
+      `lines  ${statsLine}`,
+    ]),
+    `${INDENT}${renderByline([ui.success('[允许]'), ui.danger('[拒绝]'), ui.muted('[本次会话记住]')])}`,
+    `${INDENT}${renderInputGuide([
+      { shortcut: 'Enter', action: 'allow once', bold: true },
+      { shortcut: 'Esc', action: 'reject' },
+    ])}`,
   ].join('\n');
 }
 
@@ -230,8 +268,8 @@ export function renderKeyboardHintRow(): string {
   const hints = [
     `${ui.muted('Esc')} dismiss`,
     `${ui.muted('Tab')} complete`,
-    `${ui.muted('Enter')} execute`,
-    `${ui.muted('Up/Down')} navigate`,
+    `${ui.muted('Enter')} send`,
+    `${ui.muted('↑/↓')} navigate`,
   ];
-  return `  ${truncateVisible(hints.join(ui.muted(` ${glyphs.separator} `)), UI_WIDTH)}`;
+  return `${INDENT}${truncateVisible(hints.join(ui.muted(` ${glyphs.separator} `)), UI_WIDTH)}`;
 }

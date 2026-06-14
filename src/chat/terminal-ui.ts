@@ -1,9 +1,5 @@
 import chalk from 'chalk';
 
-// === Glyph Registry ===
-// Inspired by Claude Code's KeyboardShortcutHint / Byline separator pattern.
-// Provides ASCII-safe fallbacks when the terminal cannot render Unicode glyphs.
-
 type GlyphMode = 'unicode' | 'ascii';
 
 interface GlyphMap {
@@ -96,41 +92,49 @@ export function detectGlyphMode(): GlyphMode {
   return 'unicode';
 }
 
-// === Box Drawing ===
-
 export function drawBox(title: string, subtitle?: string): string {
   const g = resolveGlyphs();
-  const w = 60;
+  const width = 60;
   const lines: string[] = [];
-  lines.push(chalk.cyan(g.boxTopLeft + g.boxHorizontal.repeat(w) + g.boxTopRight));
-  const pad = Math.max(0, Math.floor((w - title.length) / 2));
-  lines.push(chalk.cyan(g.boxVertical) + ' '.repeat(pad) + chalk.bold.white(title) + ' '.repeat(w - pad - title.length) + chalk.cyan(g.boxVertical));
+  lines.push(chalk.cyan(g.boxTopLeft + g.boxHorizontal.repeat(width) + g.boxTopRight));
+  const pad = Math.max(0, Math.floor((width - title.length) / 2));
+  lines.push(
+    chalk.cyan(g.boxVertical)
+    + ' '.repeat(pad)
+    + chalk.bold.white(title)
+    + ' '.repeat(width - pad - title.length)
+    + chalk.cyan(g.boxVertical),
+  );
   if (subtitle) {
-    const sp = Math.max(0, Math.floor((w - subtitle.length) / 2));
-    lines.push(chalk.cyan(g.boxVertical) + ' '.repeat(sp) + chalk.gray(subtitle) + ' '.repeat(w - sp - subtitle.length) + chalk.cyan(g.boxVertical));
+    const sp = Math.max(0, Math.floor((width - subtitle.length) / 2));
+    lines.push(
+      chalk.cyan(g.boxVertical)
+      + ' '.repeat(sp)
+      + chalk.gray(subtitle)
+      + ' '.repeat(width - sp - subtitle.length)
+      + chalk.cyan(g.boxVertical),
+    );
   }
-  lines.push(chalk.cyan(g.boxBottomLeft + g.boxHorizontal.repeat(w) + g.boxBottomRight));
+  lines.push(chalk.cyan(g.boxBottomLeft + g.boxHorizontal.repeat(width) + g.boxBottomRight));
   return lines.join('\n');
 }
 
-// === Status Messages ===
-
 export function printSuccess(msg: string): void {
-  console.log(chalk.green('  ' + glyphs.success + ' ') + msg);
+  console.log(chalk.green(`  ${glyphs.success} `) + msg);
 }
 
 export function printError(msg: string): void {
-  console.log(chalk.red('  ' + glyphs.error + ' ') + msg);
+  console.log(chalk.red(`  ${glyphs.error} `) + msg);
 }
 
 export function printInfo(msg: string): void {
-  console.log(chalk.blue('  ' + glyphs.info + ' ') + msg);
+  console.log(chalk.blue(`  ${glyphs.info} `) + msg);
 }
 
 export function printWarning(msg: string): void {
-  console.log(chalk.yellow('  ' + glyphs.warning + ' ') + msg);
+  console.log(chalk.yellow(`  ${glyphs.warning} `) + msg);
 }
 
 export function printDivider(): void {
-  console.log(chalk.gray('  ' + glyphs.divider.repeat(56)));
+  console.log(chalk.gray(`  ${glyphs.divider.repeat(56)}`));
 }

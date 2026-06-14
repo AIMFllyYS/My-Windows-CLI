@@ -125,3 +125,19 @@ test('system prompt does not import Claude account telemetry or login behavior',
 
   assert.doesNotMatch(prompt, /oauth|login|logout|telemetry|analytics|subscription|anthropic account/i);
 });
+
+test('markdown renderer preserves Chinese text with colors disabled', () => {
+  const { renderMarkdown } = require('../dist/chat/markdown');
+  const { setColorEnabled } = require('../dist/chat/ui/theme');
+
+  setColorEnabled(false);
+  try {
+    const output = renderMarkdown('## 计划\n\n- 保留 UTF-8 中文\n- **加粗**说明');
+    assert.equal(output.includes('\x1B['), false);
+    assert.match(output, /计划/);
+    assert.match(output, /保留 UTF-8 中文/);
+    assert.match(output, /加粗/);
+  } finally {
+    setColorEnabled(true);
+  }
+});
