@@ -114,6 +114,26 @@ test('timeline entries render tool and subagent activity', () => {
   assert.match(subagent, /running/);
 });
 
+test('thinking state line renders model mode detail and stays within width', () => {
+  const { renderThinkingState } = require('../dist/chat/ui/layout');
+  const output = renderThinkingState({
+    label: 'Agent',
+    status: 'reasoning',
+    model: 'glm-4.5-super-long-model-name',
+    mode: 'agent',
+    detail: 'planning tool calls and permissions while preserving UTF-8 中文',
+  });
+  const plain = stripAnsi(output);
+
+  assert.match(plain, /Agent/);
+  assert.match(plain, /reasoning/);
+  assert.match(plain, /glm-4\.5/);
+  assert.match(plain, /agent/);
+  assert.match(plain, /UTF-8 中文/);
+  assertNoMojibake(output, 'thinking state');
+  assert.ok(visibleLength(output) <= 66, `thinking line too wide: ${plain}`);
+});
+
 test('subagent timeline entry renders queued completed failed and cancelled rows with metrics', () => {
   const { renderSubagentTimelineEntry } = require('../dist/chat/ui/layout');
 
@@ -216,6 +236,7 @@ test('permission box formatter is wired into chat runtime', () => {
 
   assert.match(source, /formatPermissionDecision/);
   assert.match(source, /renderPlanApprovalPanel/);
+  assert.match(source, /renderThinkingState/);
   assert.match(source, /subagent runs in/);
 });
 

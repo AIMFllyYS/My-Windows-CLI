@@ -19,7 +19,7 @@ import { SubagentQueue, SubagentTask } from './agent/types';
 import { RunAgentTurnResult, runAgentTurn } from './agent/loop';
 import { resolveAgentDefinition } from './agent/definitions';
 import { createAiSubagentHandler } from './agent/runner';
-import { renderPermissionBox, renderPlanApprovalPanel, renderStatusHeader, renderSubagentTimelineEntry, renderTimelineEntry } from './ui/layout';
+import { renderPermissionBox, renderPlanApprovalPanel, renderStatusHeader, renderSubagentTimelineEntry, renderThinkingState, renderTimelineEntry } from './ui/layout';
 import { SessionPermissionMemory } from './permissions/engine';
 import { applyPermissionPromptChoice, formatPermissionDecision, formatPermissionPromptOptions, parsePermissionPromptChoice } from './permissions/prompts';
 import { buildProviderToolSpecs } from './tools/registry';
@@ -229,7 +229,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
       if (session.mode === 'agent' || session.mode === 'plan') {
         await streamAgentResponse(messages, currentModel, session, askPrompt, permissionSession, hooks);
       } else {
-        await streamAIResponse(messages, currentModel, (cancel) => {
+        await streamAIResponse(messages, currentModel, session.mode, (cancel) => {
           activeCancel = cancel;
         });
       }
@@ -724,7 +724,7 @@ async function doSearch(
 
     // Auto-trigger AI to summarize
     if (signal?.aborted) return;
-    await streamAIResponse(messages, model, onCancelReady);
+    await streamAIResponse(messages, model, 'chat', onCancelReady);
   } catch (e: any) {
     spinner.stop();
     if (signal?.aborted || e.message === 'Search cancelled') return;
@@ -736,6 +736,7 @@ async function doSearch(
 async function streamAIResponse(
   messages: ChatMessage[],
   model: ModelInfo,
+  mode: AiSessionState['mode'],
   onCancelReady?: (cancel: () => void) => void
 ): Promise<string | null> {
   const spinner = new Spinner('AI 思考中');
@@ -754,7 +755,13 @@ async function streamAIResponse(
         onReasoning: (token) => {
           if (!reasoningStarted) {
             spinner.stop();
-            console.log(chalk.gray('\n  💭 思考过程:'));
+            console.log(renderThinkingState({
+              label: 'AI',
+              status: 'reasoning',
+              model: model.name,
+              mode,
+              detail: 'streaming model reasoning',
+            }));
             reasoningStarted = true;
           }
           process.stdout.write(chalk.gray(token));
@@ -905,6 +912,13 @@ async function streamAgentResponse(
   hooks: RuntimeHooks
 ): Promise<void> {
   const spinner = new Spinner('Agent 思考中');
+  console.log(renderThinkingState({
+    label: 'Agent',
+    status: 'thinking',
+    model: model.name,
+    mode: session.mode,
+    detail: 'planning tool calls and permission boundaries',
+  }));
   spinner.start();
   const userMessage = messages[messages.length - 1];
 

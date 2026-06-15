@@ -86,6 +86,12 @@ const transcript = [
   { role: 'assistant', text: 'Choose a mode, open the AI terminal bridge, and run dashboard commands from the inspector tools panel.' },
 ];
 
+const activityTimeline = [
+  { title: 'AI thinking', meta: 'reasoning visible', detail: 'Model reasoning appears as a compact terminal state line before the answer.' },
+  { title: 'Tool timeline', meta: 'permission aware', detail: 'Tool calls, errors, subagents, and cancellations render as scan-friendly rows.' },
+  { title: 'Plan review', meta: 'manual approval', detail: 'Plan mode keeps edits locked until the CLI review panel is explicitly approved.' },
+];
+
 function formatBytes(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return 'size unknown';
   if (value < 1024 * 1024) return `${Math.ceil(value / 1024)} KB`;
@@ -334,6 +340,15 @@ function App(): React.ReactElement {
         </div>
 
         <div className="thread">
+          <section className="activityRail" aria-label="AI activity status">
+            {activityTimeline.map((item) => (
+              <div className="activityItem" key={item.title}>
+                <span>{item.title}</span>
+                <strong>{item.meta}</strong>
+                <p>{item.detail}</p>
+              </div>
+            ))}
+          </section>
           {transcript.map((item, index) => (
             <article className={`bubble ${item.role}`} key={index}>
               <span>{item.role}</span>

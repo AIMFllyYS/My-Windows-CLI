@@ -62,6 +62,14 @@ export interface TimelineEntryInput {
   detail?: string;
 }
 
+export interface ThinkingStateInput {
+  label: string;
+  status: 'thinking' | 'reasoning' | 'responding' | 'waiting';
+  model?: string;
+  mode?: AiMode;
+  detail?: string;
+}
+
 export interface SubagentTimelineInput {
   id: string;
   status: TimelineEntryInput['status'];
@@ -75,6 +83,22 @@ export interface SubagentTimelineInput {
 
 function renderPanelBody(lines: string[]): string[] {
   return lines.map((entry) => `${INDENT}${entry}`);
+}
+
+function truncateVisibleEnd(value: string, maxWidth: number): string {
+  if (visibleLength(value) <= maxWidth) return value;
+  const ellipsis = '…';
+  const ellipsisWidth = visibleLength(ellipsis);
+  if (maxWidth <= ellipsisWidth) return ellipsis.slice(0, Math.max(0, maxWidth));
+  let width = ellipsisWidth;
+  let output = '';
+  for (const char of Array.from(value).reverse()) {
+    const nextWidth = visibleLength(char);
+    if (width + nextWidth > maxWidth) break;
+    output = char + output;
+    width += nextWidth;
+  }
+  return ellipsis + output;
 }
 
 export function renderModePill(mode: AiMode, permissionMode: PermissionMode): string {
@@ -186,6 +210,26 @@ export function renderTimelineEntry(input: TimelineEntryInput): string {
     ? ui.muted(` - ${truncateVisible(input.detail, maxDetailWidth)}`)
     : '';
   return `${INDENT}${ui.muted(icon)} ${ui.strong(labelText)} ${status}${detail}`;
+}
+
+export function renderThinkingState(input: ThinkingStateInput): string {
+  const statusText = input.status === 'reasoning'
+    ? ui.accent(input.status)
+    : input.status === 'waiting'
+      ? ui.warning(input.status)
+      : ui.muted(input.status);
+  const meta = [
+    input.model ? `model ${truncateVisible(input.model, 12)}` : '',
+    input.mode ? `mode ${input.mode}` : '',
+  ].filter(Boolean).join(` ${glyphs.separator} `);
+  const prefix = `${INDENT}${glyphs.diamondOpen} ${input.label} ${input.status}${meta ? ` ${meta}` : ''}`;
+  const maxLineWidth = UI_WIDTH + INDENT.length;
+  const maxDetailWidth = Math.max(0, maxLineWidth - visibleLength(prefix) - 3);
+  const detail = input.detail && maxDetailWidth > 0
+    ? ui.muted(` - ${truncateVisibleEnd(input.detail, maxDetailWidth)}`)
+    : '';
+  const metaText = meta ? ui.muted(` ${meta}`) : '';
+  return `${INDENT}${ui.muted(glyphs.diamondOpen)} ${ui.strong(truncateVisible(input.label, 14))} ${statusText}${metaText}${detail}`;
 }
 
 function formatSubagentTimelineDetail(input: SubagentTimelineInput): string {
