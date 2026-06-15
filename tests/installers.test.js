@@ -11,6 +11,15 @@ test('windows installer registers hi command', () => {
   assert.doesNotMatch(ps1, /coding --help/);
 });
 
+test('windows installer validates repository identity before reusing current directory', () => {
+  const ps1 = readFileSync('scripts/install.ps1', 'utf8');
+
+  assert.match(ps1, /function Test-RepoRoot/);
+  assert.match(ps1, /\$pkg\.name -eq "coding-cli"/);
+  assert.match(ps1, /\$pkg\.bin\.hi -eq "\.\/dist\/index\.js"/);
+  assert.doesNotMatch(ps1, /if \(Test-Path "\.\\package\.json"\) \{ return \(Get-Location\)\.Path \}/);
+});
+
 test('macos and linux installer exists and registers hi command', () => {
   const sh = readFileSync('scripts/install.sh', 'utf8');
 

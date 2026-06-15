@@ -81,13 +81,31 @@ function Assert-Node() {
     exit 1
 }
 
+function Test-RepoRoot([string]$Path) {
+    $packagePath = Join-Path $Path "package.json"
+    if (-not (Test-Path $packagePath)) { return $false }
+    try {
+        $pkg = Get-Content -Raw -Encoding UTF8 $packagePath | ConvertFrom-Json
+    } catch {
+        return $false
+    }
+    return (
+        $pkg.name -eq "coding-cli" -and
+        $pkg.bin -and
+        $pkg.bin.hi -eq "./dist/index.js" -and
+        $pkg.scripts -and
+        $pkg.scripts.build
+    )
+}
+
 function Get-RepoRoot() {
     $scriptPath = $MyInvocation.ScriptName
     if ($scriptPath) {
         $candidate = Resolve-Path (Join-Path (Split-Path $scriptPath) "..") -ErrorAction SilentlyContinue
-        if ($candidate -and (Test-Path "$candidate\package.json")) { return $candidate.Path }
+        if ($candidate -and (Test-RepoRoot $candidate.Path)) { return $candidate.Path }
     }
-    if (Test-Path ".\package.json") { return (Get-Location).Path }
+    $current = (Get-Location).Path
+    if (Test-RepoRoot $current) { return $current }
     return ""
 }
 
