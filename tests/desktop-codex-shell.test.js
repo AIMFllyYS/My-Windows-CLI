@@ -20,6 +20,8 @@ test('desktop renderer is split into codex shell modules instead of a monolithic
     'desktop/src/renderer/codex-shell/Composer.tsx',
     'desktop/src/renderer/codex-shell/ActivityStrip.tsx',
     'desktop/src/renderer/codex-shell/InspectorPane.tsx',
+    'desktop/src/renderer/codex-shell/useConversationState.ts',
+    'desktop/src/renderer/codex-shell/useInspectorState.ts',
     'desktop/src/renderer/codex-shell/types.ts',
   ];
 
@@ -29,6 +31,10 @@ test('desktop renderer is split into codex shell modules instead of a monolithic
   assert.match(app, /CodexShell/);
   assert.ok(app.split(/\r?\n/).length < 40, 'App.tsx should stay as a thin mount file');
   assert.doesNotMatch(app, /desktopActions|InstallPanel|ClearPanel|SettingsPanel/);
+
+  const shell = read('desktop/src/renderer/codex-shell/CodexShell.tsx');
+  assert.ok(shell.split(/\r?\n/).length < 90, 'CodexShell.tsx should stay as a thin composition file');
+  assert.doesNotMatch(shell, /listInstallTargets|scanClearProcesses|getLatestRelease|sendAiMessage/);
 });
 
 test('desktop shell includes multi-session rail, rich conversation area, and codex-like composer hooks', () => {
@@ -60,6 +66,8 @@ test('desktop exposes embedded ai message ipc without raw renderer shell access'
   assert.match(preload, /sendAiMessage/);
   assert.match(aiSession, /sendDesktopAiMessage/);
   assert.match(aiSession, /runAgentTurn|chatCompleteMessage/);
+  assert.match(aiSession, /buildSystemPrompt/);
+  assert.match(aiSession, /systemPrompt/);
   assert.doesNotMatch(preload, /sendAiMessage[\s\S]*validateDesktopCommand/);
   assert.doesNotMatch(aiSession, /shell:\s*true/);
 });

@@ -11,6 +11,8 @@ function readRenderer() {
   return [
     'desktop/src/renderer/App.tsx',
     'desktop/src/renderer/codex-shell/CodexShell.tsx',
+    'desktop/src/renderer/codex-shell/useConversationState.ts',
+    'desktop/src/renderer/codex-shell/useInspectorState.ts',
     'desktop/src/renderer/codex-shell/InspectorPane.tsx',
     'desktop/src/renderer/codex-shell/ConversationView.tsx',
     'desktop/src/renderer/codex-shell/Composer.tsx',

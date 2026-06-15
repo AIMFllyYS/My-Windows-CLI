@@ -11,6 +11,8 @@ function readRenderer() {
   return [
     path.join('desktop', 'src', 'renderer', 'App.tsx'),
     path.join('desktop', 'src', 'renderer', 'codex-shell', 'CodexShell.tsx'),
+    path.join('desktop', 'src', 'renderer', 'codex-shell', 'useConversationState.ts'),
+    path.join('desktop', 'src', 'renderer', 'codex-shell', 'useInspectorState.ts'),
     path.join('desktop', 'src', 'renderer', 'codex-shell', 'InspectorPane.tsx'),
   ].map((file) => fs.readFileSync(file, 'utf8')).join('\n');
 }

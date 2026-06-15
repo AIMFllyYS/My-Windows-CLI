@@ -63,6 +63,14 @@ interface RuntimeModules {
   DEFAULT_MODEL_ID: string;
   parseAiEnv: (env: NodeJS.ProcessEnv) => { activeModelId?: string };
   buildProviderToolSpecs: (mode: DesktopAiMode) => unknown[];
+  buildSystemPrompt: (options: {
+    workspaceRoot: string;
+    mode: DesktopAiMode;
+    permissionMode: 'ask' | 'plan';
+    modelId: string;
+    toolNames?: string[];
+    env?: NodeJS.ProcessEnv;
+  }) => string;
 }
 
 function resolveRuntimeDist(): string {
@@ -99,7 +107,9 @@ function safeMessages(messages: unknown, text: unknown): DesktopAiMessage[] {
 export async function sendDesktopAiMessage(request: DesktopAiMessageRequest): Promise<DesktopAiMessageResult> {
   const runtimeDist = resolveRuntimeDist();
   const mode = resolveMode(request.mode);
+  const workspaceRoot = path.resolve(__dirname, '..', '..', '..');
   const messages = safeMessages(request.messages, request.text);
+  const permissionMode = mode === 'plan' ? 'plan' : 'ask';
 
   if (messages.length === 0) {
     return { ok: false, error: 'Message is empty.' };
@@ -111,15 +121,36 @@ export async function sendDesktopAiMessage(request: DesktopAiMessageRequest): Pr
     const { resolveModelInfo, DEFAULT_MODEL_ID } = require(path.join(runtimeDist, 'chat', 'models.js')) as Pick<RuntimeModules, 'resolveModelInfo' | 'DEFAULT_MODEL_ID'>;
     const { parseAiEnv } = require(path.join(runtimeDist, 'chat', 'config.js')) as Pick<RuntimeModules, 'parseAiEnv'>;
     const { buildProviderToolSpecs } = require(path.join(runtimeDist, 'chat', 'tools', 'registry.js')) as Pick<RuntimeModules, 'buildProviderToolSpecs'>;
+    const { buildSystemPrompt } = require(path.join(runtimeDist, 'chat', 'prompt.js')) as Pick<RuntimeModules, 'buildSystemPrompt'>;
     const settings = parseAiEnv(process.env);
     const model = resolveModelInfo(settings.activeModelId || DEFAULT_MODEL_ID, process.env);
-    const result = await runAgentTurn({
-      messages,
-      workspaceRoot: path.resolve(__dirname, '..', '..', '..'),
+    const tools = buildProviderToolSpecs(mode);
+    const toolNames = tools
+      .map((tool) => {
+        if (!tool || typeof tool !== 'object') return '';
+        const fn = (tool as { function?: { name?: unknown } }).function;
+        return typeof fn?.name === 'string' ? fn.name : '';
+      })
+      .filter(Boolean);
+    const systemPrompt = buildSystemPrompt({
+      workspaceRoot,
       mode,
-      permissionMode: mode === 'plan' ? 'plan' : 'ask',
+      permissionMode,
+      modelId: model.id,
+      toolNames,
+      env: process.env,
+    });
+    const turnMessages: RuntimeChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      ...messages.filter((message) => message.role !== 'system'),
+    ];
+    const result = await runAgentTurn({
+      messages: turnMessages,
+      workspaceRoot,
+      mode,
+      permissionMode,
       maxToolRounds: 4,
-      complete: (turnMessages: RuntimeChatMessage[]) => chatCompleteMessage(turnMessages, model, buildProviderToolSpecs(mode)),
+      complete: (messagesForTurn: RuntimeChatMessage[]) => chatCompleteMessage(messagesForTurn, model, tools),
     });
 
     if (result.status === 'permission_required') {
