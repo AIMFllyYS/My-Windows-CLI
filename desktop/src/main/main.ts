@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import { killDesktopClearProcesses, scanDesktopClearProcesses } from './clear-actions';
+import { sendDesktopAiMessage } from './ai-session';
 import { runDesktopCli, launchDesktopAiSession } from './cli-runner';
 import { getLatestRelease, getReleasePageUrl } from './github-release';
 import { listDesktopInstallTargets, runDesktopInstallTarget } from './install-actions';
@@ -61,6 +62,13 @@ app.whenReady().then(() => {
       return { ok: false, output: 'IPC sender is not trusted.' };
     }
     return launchDesktopAiSession(request);
+  });
+  ipcMain.handle('ai:message', (event, request) => {
+    const senderUrl = event.senderFrame?.url || '';
+    if (!isTrustedSender(senderUrl)) {
+      return { ok: false, error: 'IPC sender is not trusted.' };
+    }
+    return sendDesktopAiMessage(request);
   });
   ipcMain.handle('release:getLatest', async (event) => {
     const senderUrl = event.senderFrame?.url || '';

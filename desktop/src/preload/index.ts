@@ -10,6 +10,12 @@ contextBridge.exposeInMainWorld('zeroOneCli', {
     return ipcRenderer.invoke('cli:run', command);
   },
   launchAiSession: (request?: { mode?: 'chat' | 'agent' | 'plan' }) => ipcRenderer.invoke('ai:launch', request || {}),
+  sendAiMessage: (request: {
+    sessionId: string;
+    mode: 'chat' | 'agent' | 'plan';
+    messages: Array<{ id?: string; role: 'system' | 'user' | 'assistant' | 'tool'; content: string; meta?: string }>;
+    text: string;
+  }) => ipcRenderer.invoke('ai:message', request),
   getLatestRelease: () => ipcRenderer.invoke('release:getLatest'),
   openLatestRelease: () => ipcRenderer.invoke('release:openLatest'),
   openReleaseAsset: (url: string) => ipcRenderer.invoke('release:openAsset', url),

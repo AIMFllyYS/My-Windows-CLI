@@ -7,6 +7,14 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
+function readRenderer() {
+  return [
+    path.join('desktop', 'src', 'renderer', 'App.tsx'),
+    path.join('desktop', 'src', 'renderer', 'codex-shell', 'CodexShell.tsx'),
+    path.join('desktop', 'src', 'renderer', 'codex-shell', 'InspectorPane.tsx'),
+  ].map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+}
+
 test('root package exposes desktop scripts', () => {
   const pkg = readJson('package.json');
 
@@ -74,7 +82,7 @@ test('desktop runner supports packaged CLI resource path', () => {
 test('desktop IPC bridge restricts renderer origin and noninteractive commands', () => {
   const main = fs.readFileSync(path.join('desktop', 'src', 'main', 'main.ts'), 'utf8');
   const permissions = fs.readFileSync(path.join('desktop', 'src', 'main', 'permissions.ts'), 'utf8');
-  const renderer = fs.readFileSync(path.join('desktop', 'src', 'renderer', 'App.tsx'), 'utf8');
+  const renderer = readRenderer();
   const actions = fs.readFileSync(path.join('desktop', 'src', 'renderer', 'action-catalog.ts'), 'utf8');
   const runner = fs.readFileSync(path.join('desktop', 'src', 'main', 'cli-runner.ts'), 'utf8');
   const allowedBlock = permissions.match(/ALLOWED_COMMANDS = new Set\(\[([\s\S]*?)\]\)/)?.[1] || '';
@@ -114,7 +122,7 @@ test('desktop exposes trusted GitHub release IPC without hardcoded tokens', () =
   const main = fs.readFileSync(path.join('desktop', 'src', 'main', 'main.ts'), 'utf8');
   const preload = fs.readFileSync(path.join('desktop', 'src', 'preload', 'index.ts'), 'utf8');
   const release = fs.readFileSync(path.join('desktop', 'src', 'main', 'github-release.ts'), 'utf8');
-  const renderer = fs.readFileSync(path.join('desktop', 'src', 'renderer', 'App.tsx'), 'utf8');
+  const renderer = readRenderer();
 
   assert.match(main, /release:getLatest/);
   assert.match(main, /release:openLatest/);
@@ -134,7 +142,7 @@ test('desktop exposes trusted GitHub release IPC without hardcoded tokens', () =
 });
 
 test('desktop release panel renders latest assets as safe buttons', () => {
-  const renderer = fs.readFileSync(path.join('desktop', 'src', 'renderer', 'App.tsx'), 'utf8');
+  const renderer = readRenderer();
   const styles = fs.readFileSync(path.join('desktop', 'src', 'renderer', 'styles.css'), 'utf8');
 
   assert.match(renderer, /releaseInfo/);

@@ -7,6 +7,16 @@ function read(file) {
   return fs.readFileSync(path.join(...file.split('/')), 'utf8');
 }
 
+function readRenderer() {
+  return [
+    'desktop/src/renderer/App.tsx',
+    'desktop/src/renderer/codex-shell/CodexShell.tsx',
+    'desktop/src/renderer/codex-shell/InspectorPane.tsx',
+    'desktop/src/renderer/codex-shell/ConversationView.tsx',
+    'desktop/src/renderer/codex-shell/Composer.tsx',
+  ].map(read).join('\n');
+}
+
 test('desktop action catalog exposes native install skills clear and utility actions', () => {
   const catalog = read('desktop/src/renderer/action-catalog.ts');
 
@@ -74,7 +84,7 @@ test('desktop clear IPC scans first and requires explicit confirmation before ki
 });
 
 test('desktop renderer opens native install panel instead of running interactive install command', () => {
-  const renderer = read('desktop/src/renderer/App.tsx');
+  const renderer = readRenderer();
 
   assert.match(renderer, /activeAction === 'install'/);
   assert.match(renderer, /listInstallTargets/);
@@ -84,7 +94,7 @@ test('desktop renderer opens native install panel instead of running interactive
 });
 
 test('desktop renderer opens native skills panel instead of running interactive skills command', () => {
-  const renderer = read('desktop/src/renderer/App.tsx');
+  const renderer = readRenderer();
 
   assert.match(renderer, /activeAction === 'skills'/);
   assert.match(renderer, /listSkillPackages/);
@@ -94,7 +104,7 @@ test('desktop renderer opens native skills panel instead of running interactive 
 });
 
 test('desktop renderer opens native clear panel instead of running interactive clear command', () => {
-  const renderer = read('desktop/src/renderer/App.tsx');
+  const renderer = readRenderer();
 
   assert.match(renderer, /activeAction === 'clear'/);
   assert.match(renderer, /scanClearProcesses/);
@@ -132,7 +142,7 @@ test('desktop cli runner times out long running commands', () => {
 });
 
 test('desktop renderer exposes copyable command output and busy guard', () => {
-  const renderer = read('desktop/src/renderer/App.tsx');
+  const renderer = readRenderer();
   const styles = read('desktop/src/renderer/styles.css');
 
   assert.match(renderer, /copyOutput/);
@@ -166,7 +176,7 @@ test('desktop ai bridge uses dedicated ipc and does not expose raw shell', () =>
 });
 
 test('desktop renderer separates ai bridge from dashboard commands', () => {
-  const renderer = read('desktop/src/renderer/App.tsx');
+  const renderer = readRenderer();
 
   assert.match(renderer, /launchAiSession/);
   assert.doesNotMatch(renderer, /runCommand\(['"]hi --ai['"]\)/);
@@ -175,30 +185,30 @@ test('desktop renderer separates ai bridge from dashboard commands', () => {
 });
 
 test('desktop renderer mirrors cli modes and balanced shell layout', () => {
-  const renderer = read('desktop/src/renderer/App.tsx');
+  const renderer = readRenderer();
   const styles = read('desktop/src/renderer/styles.css');
 
   assert.match(renderer, /read-only/);
   assert.match(renderer, /asks before tools/);
   assert.match(renderer, /no edits/);
-  assert.match(renderer, /modeSwitch/);
-  assert.match(styles, /\.shell\s*\{/);
-  assert.match(styles, /\.sidebar\s*\{/);
-  assert.match(styles, /\.conversation\s*\{/);
-  assert.match(styles, /\.inspector\s*\{/);
-  assert.match(styles, /\.composer\s*\{/);
+  assert.match(renderer, /modeTabs/);
+  assert.match(styles, /\.codexShell\s*\{/);
+  assert.match(styles, /\.sessionRail\s*\{/);
+  assert.match(styles, /\.conversationPane\s*\{/);
+  assert.match(styles, /\.inspectorPane\s*\{/);
+  assert.match(styles, /\.composerBar\s*\{/);
 });
 
 test('desktop renderer shows ai thinking and tool activity status rails', () => {
-  const renderer = read('desktop/src/renderer/App.tsx');
+  const renderer = readRenderer();
   const styles = read('desktop/src/renderer/styles.css');
 
-  assert.match(renderer, /activityTimeline/);
-  assert.match(renderer, /AI thinking/);
-  assert.match(renderer, /Tool timeline/);
-  assert.match(renderer, /Plan review/);
-  assert.match(styles, /\.activityRail/);
-  assert.match(styles, /\.activityItem/);
+  assert.match(renderer, /START_ACTIVITY/);
+  assert.match(renderer, /Thinking/);
+  assert.match(renderer, /Tools/);
+  assert.match(renderer, /Plan/);
+  assert.match(styles, /\.activityStrip/);
+  assert.match(styles, /\.activityChip/);
 });
 
 test('desktop vite build uses file-safe relative renderer assets', () => {
@@ -209,7 +219,7 @@ test('desktop vite build uses file-safe relative renderer assets', () => {
 });
 
 test('desktop settings panel explains cli setting flow', () => {
-  const renderer = read('desktop/src/renderer/App.tsx');
+  const renderer = readRenderer();
 
   assert.match(renderer, /\/setting/);
   assert.match(renderer, /SettingsPanel/);
