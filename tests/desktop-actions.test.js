@@ -189,6 +189,25 @@ test('desktop renderer mirrors cli modes and balanced shell layout', () => {
   assert.match(styles, /\.composer\s*\{/);
 });
 
+test('desktop renderer shows ai thinking and tool activity status rails', () => {
+  const renderer = read('desktop/src/renderer/App.tsx');
+  const styles = read('desktop/src/renderer/styles.css');
+
+  assert.match(renderer, /activityTimeline/);
+  assert.match(renderer, /AI thinking/);
+  assert.match(renderer, /Tool timeline/);
+  assert.match(renderer, /Plan review/);
+  assert.match(styles, /\.activityRail/);
+  assert.match(styles, /\.activityItem/);
+});
+
+test('desktop vite build uses file-safe relative renderer assets', () => {
+  const viteConfig = read('desktop/vite.config.ts');
+
+  assert.match(viteConfig, /base:\s*['"]\.\/['"]/);
+  assert.match(viteConfig, /emptyOutDir:\s*true/);
+});
+
 test('desktop settings panel explains cli setting flow', () => {
   const renderer = read('desktop/src/renderer/App.tsx');
 

@@ -210,6 +210,40 @@ input {
   overflow: auto;
 }
 
+.activityRail {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.activityItem {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 12px 12px 14px;
+  border-left: 2px solid #9be7c7;
+  background: rgba(155, 231, 199, 0.055);
+}
+
+.activityItem span {
+  color: #9a9489;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.activityItem strong {
+  color: #f4f0e8;
+  font-size: 13px;
+}
+
+.activityItem p {
+  margin: 0;
+  color: #b8b0a3;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .bubble {
   max-width: 820px;
   margin-bottom: 16px;

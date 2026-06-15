@@ -5,6 +5,7 @@ import { resolveOverlayDismissKeyAction, resolveSlashPromptKeyAction } from './k
 import { AiMode } from './session';
 import { glyphs } from './terminal-ui';
 import { isPathLikeToken, getPathSuggestions } from './path-completion';
+import { visibleLength } from './ui/theme';
 import type { SuggestionItem } from './suggestions';
 import {
   collectUnifiedSuggestions,
@@ -258,6 +259,45 @@ export function applySlashSelection(state: SlashTypeaheadState, key: 'tab' | 'en
   return { action: 'execute', input: command };
 }
 
+export function sanitizePromptInsert(value: string): string {
+  return value
+    .replace(/\r\n|\r|\n/g, ' ')
+    .replace(/\t/g, ' ')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+}
+
+function takeVisibleEnd(value: string, maxWidth: number): string {
+  if (visibleLength(value) <= maxWidth) return value;
+  const ellipsis = '…';
+  const ellipsisWidth = visibleLength(ellipsis);
+  if (maxWidth <= ellipsisWidth) return ellipsis.slice(0, Math.max(0, maxWidth));
+
+  let width = ellipsisWidth;
+  let output = '';
+  for (const char of Array.from(value).reverse()) {
+    const nextWidth = visibleLength(char);
+    if (width + nextWidth > maxWidth) break;
+    output = char + output;
+    width += nextWidth;
+  }
+  return ellipsis + output;
+}
+
+function promptRedrawText(prompt: string): string {
+  return prompt.replace(/^(?:\r?\n)+/, '');
+}
+
+function outputColumns(output: NodeJS.WriteStream): number {
+  const columns = Number(output.columns || 0);
+  return Number.isFinite(columns) && columns > 10 ? columns : 80;
+}
+
+export function formatPromptInputForDisplay(value: string, prompt: string, columns: number): string {
+  const singleLineValue = sanitizePromptInsert(value);
+  const maxInputWidth = Math.max(1, columns - visibleLength(promptRedrawText(prompt)));
+  return takeVisibleEnd(singleLineValue, maxInputWidth);
+}
+
 export function renderSlashTypeahead(state: SlashTypeaheadState): string {
   if (!state.active) return '';
   const maxVisible = 5;
@@ -282,6 +322,7 @@ export function renderSlashTypeahead(state: SlashTypeaheadState): string {
 export function promptWithSlashTypeahead(options: SlashPromptOptions): Promise<string> {
   const input = options.input || process.stdin;
   const output = options.output || process.stdout;
+  const redrawPrompt = promptRedrawText(options.prompt);
   let value = '';
   let state = createSlashTypeaheadState('', options.mode);
   let renderedSuggestionLines = 0;
@@ -290,15 +331,17 @@ export function promptWithSlashTypeahead(options: SlashPromptOptions): Promise<s
   const clearSuggestions = () => {
     if (renderedSuggestionLines === 0) return;
     for (let i = 0; i < renderedSuggestionLines; i += 1) {
-      output.write('\x1B[1A\x1B[2K');
+      output.write('\x1B[1B\r\x1B[2K');
     }
+    output.write(`\x1B[${renderedSuggestionLines}A\r`);
     renderedSuggestionLines = 0;
   };
 
   const render = () => {
     clearSuggestions();
-    output.write(`\r\x1B[2K${options.prompt}${value}`);
-    const ghost = getMidInputSlashGhostText(value, value.length, options.mode);
+    const displayValue = formatPromptInputForDisplay(value, redrawPrompt, outputColumns(output));
+    output.write(`\r\x1B[2K${redrawPrompt}${displayValue}`);
+    const ghost = displayValue === value ? getMidInputSlashGhostText(value, value.length, options.mode) : null;
     if (ghost && !state.active) {
       output.write(chalk.gray(ghost.text));
       output.write(`\x1B[${ghost.text.length}D`);
@@ -309,7 +352,8 @@ export function promptWithSlashTypeahead(options: SlashPromptOptions): Promise<s
       output.write(`\n${rendered}`);
       renderedSuggestionLines = lines.length;
       output.write(`\x1B[${renderedSuggestionLines}A`);
-      output.write(`\r\x1B[${options.prompt.length + value.length}C`);
+      const cursorColumn = visibleLength(`${redrawPrompt}${displayValue}`);
+      output.write(`\r${cursorColumn > 0 ? `\x1B[${cursorColumn}C` : ''}`);
     }
   };
 
@@ -397,7 +441,7 @@ export function promptWithSlashTypeahead(options: SlashPromptOptions): Promise<s
           render();
           return;
         case 'insert':
-          value += keyAction.value;
+          value += sanitizePromptInsert(keyAction.value);
           refreshState();
           render();
           return;
