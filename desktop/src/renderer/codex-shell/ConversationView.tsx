@@ -4,6 +4,12 @@ import { Composer } from './Composer';
 import { MessageList } from './MessageList';
 import type { ActivityItem, ConversationMessage, Mode } from './types';
 
+const MODE_PILL_LABEL: Record<Mode, string> = {
+  chat: 'Chat',
+  agent: 'Build',
+  plan: 'Plan',
+};
+
 export function ConversationView(props: {
   title: string;
   mode: Mode;
@@ -16,14 +22,16 @@ export function ConversationView(props: {
   return (
     <section className="conversationPane">
       <header className="conversationHeader">
-        <div>
+        <div className="conversationHeading">
           <p>Workspace</p>
           <h1>{props.title}</h1>
         </div>
-        <span className="modePill">/{props.mode}</span>
+        <span className={`modePill mode-${props.mode}`}>{MODE_PILL_LABEL[props.mode]}</span>
       </header>
-      <ActivityStrip items={props.activity} busy={props.busy} />
-      <MessageList messages={props.messages} />
+      <div className="conversationScroll">
+        <MessageList messages={props.messages} />
+        <ActivityStrip items={props.activity} busy={props.busy} />
+      </div>
       <Composer mode={props.mode} busy={props.busy} onMode={props.onMode} onSend={props.onSend} />
     </section>
   );

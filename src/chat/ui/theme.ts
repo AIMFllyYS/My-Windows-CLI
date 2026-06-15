@@ -21,8 +21,9 @@ function paint(style: chalk.Chalk, value: string): string {
 }
 
 export const ui = {
-  brand: (value: string) => paint(chalk.hex('#7dd3fc'), value),
-  accent: (value: string) => paint(chalk.hex('#a7f3d0'), value),
+  // Claude Code brand orange rgb(215,119,87) and blue-purple accent rgb(177,185,249).
+  brand: (value: string) => paint(chalk.hex('#d77757'), value),
+  accent: (value: string) => paint(chalk.hex('#b1b9f9'), value),
   muted: (value: string) => paint(chalk.gray, value),
   warning: (value: string) => paint(chalk.yellow, value),
   danger: (value: string) => paint(chalk.red, value),
@@ -35,6 +36,8 @@ export const ui = {
   h3: (value: string) => paint(chalk.bold.yellow, value),
   italic: (value: string) => paint(chalk.italic, value),
   inlineCode: (value: string) => (colorEnabled && chalk.level > 0 ? chalk.bgGray.white(` ${value} `) : ` ${value} `),
+  // Claude Code renders codespans with a single accent color (no background box).
+  inlineCodeFlat: (value: string) => paint(chalk.hex('#b1b9f9'), value),
   strike: (value: string) => paint(chalk.strikethrough.gray, value),
 };
 

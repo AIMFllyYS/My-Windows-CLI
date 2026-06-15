@@ -32,7 +32,7 @@ import { handleApiGuide } from './modules/api';
 import { handlePayGuide } from './modules/pay';
 
 const program = new Command();
-const VERSION = '0.6.15';
+const VERSION = '0.7.0';
 
 function renderChineseHelp(): string {
   return [

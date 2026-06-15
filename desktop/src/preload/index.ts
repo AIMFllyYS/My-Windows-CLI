@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { IpcRendererEvent } from 'electron';
 import { validateDesktopCommand } from '../main/permissions';
 
 contextBridge.exposeInMainWorld('zeroOneCli', {
@@ -15,6 +16,17 @@ contextBridge.exposeInMainWorld('zeroOneCli', {
     mode: 'chat' | 'agent' | 'plan';
     text: string;
   }) => ipcRenderer.invoke('ai:message', request),
+  // Subscribe to live agent progress streamed during an ai:message turn.
+  // Returns an unsubscribe function. ipcRenderer itself is never exposed.
+  onAiEvent: (callback: (payload: { sessionId: string; event: unknown; file?: unknown }) => void): (() => void) => {
+    const listener = (_event: IpcRendererEvent, payload: { sessionId: string; event: unknown; file?: unknown }) => {
+      callback(payload);
+    };
+    ipcRenderer.on('ai:event', listener);
+    return () => {
+      ipcRenderer.removeListener('ai:event', listener);
+    };
+  },
   getLatestRelease: () => ipcRenderer.invoke('release:getLatest'),
   openLatestRelease: () => ipcRenderer.invoke('release:openLatest'),
   openReleaseAsset: (url: string) => ipcRenderer.invoke('release:openAsset', url),

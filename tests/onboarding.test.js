@@ -21,10 +21,10 @@ test('hi startup prints logo and zero-one welcome copy once before guide', () =>
   const output = execFileSync('node', ['dist/index.js'], { encoding: 'utf8' });
 
   assert.match(output, /██████╗\s+██╗\s+██████╗██╗\s+██╗/);
-  assert.match(output, /0-1 CLI v0\.6\.15/);
+  assert.match(output, /0-1 CLI v0\.7\.0/);
   assert.match(output, /树林曾云：从0到1是最贵的/);
   assert.match(output, /希望这个CLI可以帮助你从0到1入门AI-CLI工具/);
-  assert.equal((output.match(/0-1 CLI v0\.6\.15/g) || []).length, 1);
+  assert.equal((output.match(/0-1 CLI v0\.7\.0/g) || []).length, 1);
 });
 
 test('unhandled hi arguments print help instead of the default guide', () => {

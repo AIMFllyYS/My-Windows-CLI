@@ -68,7 +68,9 @@ app.whenReady().then(() => {
     if (!isTrustedSender(senderUrl)) {
       return { ok: false, error: 'IPC sender is not trusted.' };
     }
-    return sendDesktopAiMessage(request);
+    // Pass the requesting WebContents so the embedded turn can stream live
+    // AgentTurnEvents back over the 'ai:event' channel.
+    return sendDesktopAiMessage(request, event.sender);
   });
   ipcMain.handle('release:getLatest', async (event) => {
     const senderUrl = event.senderFrame?.url || '';

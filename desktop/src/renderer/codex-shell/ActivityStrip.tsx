@@ -1,17 +1,11 @@
 import React from 'react';
+import { AgentTimeline } from './AgentTimeline';
 import type { ActivityItem } from './types';
 
-export function ActivityStrip(props: { items: ActivityItem[]; busy: boolean }): React.ReactElement {
-  return (
-    <section className="activityStrip" aria-label="AI activity">
-      <div className={props.busy ? 'thinkingDot active' : 'thinkingDot'} />
-      {props.items.map((item) => (
-        <article className="activityChip" key={`${item.title}-${item.status}`}>
-          <strong>{item.title}</strong>
-          <span>{item.status}</span>
-          <p>{item.detail}</p>
-        </article>
-      ))}
-    </section>
-  );
+/**
+ * Thin compatibility wrapper. The static three-chip strip has been replaced by
+ * the live AgentTimeline; this keeps the ConversationView import stable.
+ */
+export function ActivityStrip(props: { items: ActivityItem[]; busy: boolean }): React.ReactElement | null {
+  return <AgentTimeline items={props.items} busy={props.busy} />;
 }

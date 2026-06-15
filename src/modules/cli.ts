@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import { renderMarkdown } from '../utils/markdown';
 
 interface CliTool {
   name: string;
@@ -121,21 +121,26 @@ const CLI_TOOLS: CliTool[] = [
 export function getCliCommands(task?: string | null): string {
   const taskStr = task || 'Your task here';
 
-  let output = '';
+  const md: string[] = ['## CLI Auto Commands', ''];
 
   for (const cli of CLI_TOOLS) {
     const cmd = cli.autoCmd.replace('{TASK}', `"${taskStr}"`);
-    output += chalk.cyan(`  ${cli.name}:`) + chalk.white(` ${cli.command}\n`);
-    output += chalk.gray(`    ${cmd}\n\n`);
+    md.push(`### ${cli.name} (\`${cli.command}\`)`);
+    md.push('');
+    md.push('```bash');
+    md.push(cmd);
+    md.push('```');
+    md.push('');
   }
 
-  output += chalk.bold('\n💡 Quick Tips:\n');
-  output += chalk.gray('  - Use --no-interactive / -p for automated runs\n');
-  output += chalk.gray('  - Use --trust-all-tools / --dangerously-skip-permissions for full access\n');
-  output += chalk.gray('  - Combine with --model to specify AI model\n');
-  output += chalk.gray('  - Add --output-format json for machine-readable output\n');
+  md.push('### Quick Tips');
+  md.push('');
+  md.push('- Use `--no-interactive` / `-p` for automated runs');
+  md.push('- Use `--trust-all-tools` / `--dangerously-skip-permissions` for full access');
+  md.push('- Combine with `--model` to specify AI model');
+  md.push('- Add `--output-format json` for machine-readable output');
 
-  return output;
+  return renderMarkdown(md.join('\n'));
 }
 
 export function getCliByTool(tool: string, task?: string | null): string {
@@ -149,27 +154,37 @@ export function getCliByTool(tool: string, task?: string | null): string {
   const selected = cliMap[normalized];
 
   if (!selected) {
-    return chalk.red(`Unknown CLI tool: ${tool}\n`) +
-           chalk.gray(`Available: ${CLI_TOOLS.map(c => c.name).join(', ')}\n`);
+    const md = [
+      `## Unknown CLI tool: ${tool}`,
+      '',
+      `Available: ${CLI_TOOLS.map((c) => c.name).join(', ')}`,
+    ].join('\n');
+    return renderMarkdown(md);
   }
 
   const taskStr = task || 'Your task here';
-
-  let output = '';
-  output += chalk.bold.cyan(`\n╔══════════════════════════════════════════════════════════════╗\n`);
-  output += chalk.bold.cyan(`║  ${selected.name} (${selected.command})                              ║\n`);
-  output += chalk.bold.cyan(`╚══════════════════════════════════════════════════════════════╝\n\n`);
-
-  // Auto 运行指令
-  output += chalk.bold.green('⚡ Auto 运行指令:\n');
   const autoCmd = selected.autoCmd.replace('{TASK}', `"${taskStr}"`);
-  output += chalk.white(`  ${autoCmd}\n\n`);
 
-  // 常用命令列表
-  output += chalk.bold.yellow(`📋 常用命令:\n`);
+  const md: string[] = [
+    `## ${selected.name} (\`${selected.command}\`)`,
+    '',
+    '### ⚡ Auto 运行指令',
+    '',
+    '```bash',
+    autoCmd,
+    '```',
+    '',
+    '### 📋 常用命令',
+    '',
+    '| 命令 | 说明 |',
+    '| --- | --- |',
+  ];
+
   for (const cmd of selected.commands) {
-    output += chalk.cyan(`  ${selected.command} ${cmd.cmd}`) + chalk.gray(`\n    ${cmd.desc}\n`);
+    const fullCmd = `${selected.command} ${cmd.cmd}`.replace(/\|/g, '\\|');
+    const desc = cmd.desc.replace(/\|/g, '\\|');
+    md.push(`| \`${fullCmd}\` | ${desc} |`);
   }
 
-  return output;
+  return renderMarkdown(md.join('\n'));
 }

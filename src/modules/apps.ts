@@ -1,6 +1,6 @@
-import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
+import { renderMarkdown } from '../utils/markdown';
 
 interface AppInfo {
   name: string;
@@ -145,25 +145,28 @@ function findAppPath(app: AppInfo): string | null {
 }
 
 export function getApps(): string {
-  let output = '';
+  const md: string[] = [
+    '## App Launch Commands',
+    '',
+    '| 状态 | 应用 | 启动命令 | 说明 | 路径 |',
+    '| :---: | --- | --- | --- | --- |',
+  ];
 
   for (const app of COMMON_APPS) {
     const foundPath = findAppPath(app);
-    const status = foundPath ? chalk.green('✓') : chalk.gray('○');
-    const pathStr = foundPath ? chalk.gray(` (${foundPath.replace(/\\/g, '/')})`) : '';
-
-    output += `\n  ${status} ${chalk.white(app.name)}`;
-    output += chalk.cyan(` ${app.launchCmd}`);
-    output += chalk.gray(` - ${app.description}`);
-    if (pathStr) output += pathStr;
+    const status = foundPath ? '✓' : '○';
+    const pathStr = foundPath ? foundPath.replace(/\\/g, '/') : '—';
+    md.push(`| ${status} | ${app.name} | \`${app.launchCmd}\` | ${app.description} | ${pathStr} |`);
   }
 
-  output += chalk.bold('\n\n💡 Quick Launch Examples:\n');
-  output += chalk.gray('  code .') + chalk.white('        - Open VS Code here\n');
-  output += chalk.gray('  cursor .') + chalk.white('       - Open Cursor here\n');
-  output += chalk.gray('  explorer .') + chalk.white('      - Open File Explorer here\n');
-  output += chalk.gray('  wt') + chalk.white('             - Open Windows Terminal here\n');
-  output += chalk.gray('  start chrome') + chalk.white('   - Open Chrome\n');
+  md.push('');
+  md.push('### 💡 Quick Launch Examples');
+  md.push('');
+  md.push('- `code .` — Open VS Code here');
+  md.push('- `cursor .` — Open Cursor here');
+  md.push('- `explorer .` — Open File Explorer here');
+  md.push('- `wt` — Open Windows Terminal here');
+  md.push('- `start chrome` — Open Chrome');
 
-  return output;
+  return renderMarkdown(md.join('\n'));
 }

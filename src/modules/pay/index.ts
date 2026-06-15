@@ -1,7 +1,7 @@
 import * as readline from 'readline';
-import chalk from 'chalk';
 import { interactiveSelect } from '../../utils/selector';
 import { openUrl } from '../../utils/open-url';
+import { renderMarkdown } from '../../utils/markdown';
 import { PAY_RESOURCES, PayResource } from './registry';
 
 export { PAY_RESOURCES };
@@ -17,9 +17,14 @@ function askEnter(): Promise<string> {
 }
 
 function printResource(resource: PayResource): void {
-  console.log(chalk.bold.cyan(`\n${resource.name}`));
-  console.log(chalk.gray(resource.description));
-  console.log(chalk.blue(resource.url));
+  const md = [
+    `## ${resource.name}`,
+    '',
+    resource.description,
+    '',
+    `<${resource.url}>`,
+  ].join('\n');
+  console.log(renderMarkdown(md));
 }
 
 export async function handlePayGuide(): Promise<void> {

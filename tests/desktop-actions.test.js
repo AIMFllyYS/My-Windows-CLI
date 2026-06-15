@@ -200,16 +200,20 @@ test('desktop renderer mirrors cli modes and balanced shell layout', () => {
   assert.match(styles, /\.composerBar\s*\{/);
 });
 
-test('desktop renderer shows ai thinking and tool activity status rails', () => {
-  const renderer = readRenderer();
+test('desktop renderer shows a live ai thinking and tool activity timeline', () => {
+  const conversationState = read('desktop/src/renderer/codex-shell/useConversationState.ts');
+  const timeline = read('desktop/src/renderer/codex-shell/AgentTimeline.tsx');
   const styles = read('desktop/src/renderer/styles.css');
 
-  assert.match(renderer, /START_ACTIVITY/);
-  assert.match(renderer, /Thinking/);
-  assert.match(renderer, /Tools/);
-  assert.match(renderer, /Plan/);
-  assert.match(styles, /\.activityStrip/);
-  assert.match(styles, /\.activityChip/);
+  // The static three-chip strip (START_ACTIVITY) is replaced by a live timeline
+  // reduced from the agent-event stream.
+  assert.doesNotMatch(conversationState, /START_ACTIVITY/);
+  assert.match(conversationState, /reduceEvent/);
+  assert.match(timeline, /Thinking|thinking/);
+  assert.match(timeline, /agentTimeline/);
+  // A thinking indicator + per-tool rows are styled.
+  assert.match(styles, /\.thinkingDot/);
+  assert.match(styles, /\.activityRow/);
 });
 
 test('desktop vite build uses file-safe relative renderer assets', () => {
@@ -225,4 +229,34 @@ test('desktop primary renderer keeps settings panel out of the ai workspace', ()
   assert.doesNotMatch(renderer, /\/setting/);
   assert.doesNotMatch(renderer, /SettingsPanel/);
   assert.doesNotMatch(renderer, /Open AI terminal/i);
+});
+
+test('desktop command panel runs the classic cli commands GUI-style for every catalog action', () => {
+  const rail = read('desktop/src/renderer/codex-shell/SessionRail.tsx');
+  const panel = read('desktop/src/renderer/codex-shell/CommandPanel.tsx');
+  const catalog = read('desktop/src/renderer/action-catalog.ts');
+
+  // Every classic command id is still present and surfaced as a clickable card.
+  ['clear', 'skills', 'install', 'state', 'api', 'pay'].forEach((id) => {
+    assert.match(catalog, new RegExp(`id: '${id}'`), `${id} action missing from catalog`);
+  });
+  assert.match(rail, /desktopActions\.map/);
+  // state/api/pay run through the whitelisted runCommand path inside the inspector hook.
+  const inspector = read('desktop/src/renderer/codex-shell/useInspectorState.ts');
+  assert.match(inspector, /runCommand\(action\.command\)/);
+  assert.match(inspector, /validateDesktopCommand|window\.zeroOneCli\.runCommand/);
+  // SAFETY: native install/skills/clear still confirm: true before running.
+  assert.match(inspector, /confirm:\s*true/);
+  // The panel surfaces command output without reintroducing the old output panel class.
+  assert.match(panel, /commandOutput/);
+  assert.doesNotMatch(panel, /outputPanel/);
+});
+
+test('desktop diff card consumes the exact Claude diff palette tokens', () => {
+  const styles = read('desktop/src/renderer/styles.css');
+
+  assert.match(styles, /--diff-added-word:\s*#38a660/);
+  assert.match(styles, /--diff-removed-word:\s*#b3596b/);
+  assert.match(styles, /\.diffAdded[\s\S]*var\(--diff-added-bg\)/);
+  assert.match(styles, /\.diffRemoved[\s\S]*var\(--diff-removed-bg\)/);
 });

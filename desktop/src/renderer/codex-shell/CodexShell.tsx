@@ -11,6 +11,7 @@ export function CodexShell(): React.ReactElement {
       <SessionRail
         sessions={conversation.sessions}
         activeId={conversation.activeSessionId}
+        mode={conversation.mode}
         onSelect={conversation.setActiveSessionId}
         onNew={conversation.createSession}
       />

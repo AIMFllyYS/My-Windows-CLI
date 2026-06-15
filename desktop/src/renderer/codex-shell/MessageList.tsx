@@ -1,50 +1,20 @@
 import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import type { ConversationMessage } from './types';
+import 'highlight.js/styles/github-dark.css';
 
 const VISIBLE_MESSAGE_LIMIT = 80;
 
-function renderInline(value: string): React.ReactNode[] {
-  const parts = value.split(/(`[^`]+`)/g);
-  return parts.map((part, index) => {
-    if (part.startsWith('`') && part.endsWith('`')) {
-      return <code key={index}>{part.slice(1, -1)}</code>;
-    }
-    return <React.Fragment key={index}>{part}</React.Fragment>;
-  });
-}
+const MARKDOWN_PLUGINS = [remarkGfm];
+const REHYPE_PLUGINS = [[rehypeHighlight, { detect: true, ignoreMissing: true }]] as const;
 
-function renderMarkdown(content: string): React.ReactElement[] {
-  const lines = content.split(/\r?\n/);
-  const rendered: React.ReactElement[] = [];
-  let code: string[] = [];
-  let inCode = false;
-
-  lines.forEach((line, index) => {
-    if (line.trim().startsWith('```')) {
-      if (inCode) {
-        rendered.push(<pre key={`code-${index}`}><code>{code.join('\n')}</code></pre>);
-        code = [];
-      }
-      inCode = !inCode;
-      return;
-    }
-    if (inCode) {
-      code.push(line);
-      return;
-    }
-    if (/^\s*[-*]\s+/.test(line)) {
-      rendered.push(<p className="mdBullet" key={index}>{renderInline(line.replace(/^\s*[-*]\s+/, ''))}</p>);
-      return;
-    }
-    if (/^\s*\|.+\|\s*$/.test(line)) {
-      rendered.push(<pre className="mdTable" key={index}>{line}</pre>);
-      return;
-    }
-    rendered.push(<p key={index}>{renderInline(line)}</p>);
-  });
-
-  if (code.length) rendered.push(<pre key="code-tail"><code>{code.join('\n')}</code></pre>);
-  return rendered;
+function roleLabel(role: ConversationMessage['role']): string {
+  if (role === 'assistant') return 'Assistant';
+  if (role === 'user') return 'You';
+  if (role === 'tool') return 'Tool';
+  return 'System';
 }
 
 function MessageListView(props: { messages: ConversationMessage[] }): React.ReactElement {
@@ -52,15 +22,37 @@ function MessageListView(props: { messages: ConversationMessage[] }): React.Reac
 
   return (
     <div className="messageList" aria-label="Conversation">
+      {visibleMessages.length === 0 && (
+        <div className="emptyConversation">
+          <div className="emptyGlyph" aria-hidden="true">
+            01
+          </div>
+          <h2>Start a conversation</h2>
+          <p>Ask 0-1 CLI to inspect, plan, edit, or explain. Agent activity and file changes stream in live.</p>
+        </div>
+      )}
       {visibleMessages.map((message) => (
         <article className={`messageRow ${message.role}`} key={message.id}>
-          <div className="messageAvatar">{message.role === 'assistant' ? 'AI' : message.role.slice(0, 2)}</div>
+          {message.role === 'assistant' && (
+            <div className="messageAvatar brand" aria-hidden="true">
+              ✶
+            </div>
+          )}
           <div className="messageBody">
             <header>
-              <strong>{message.role}</strong>
+              <strong className={message.streaming ? 'streamingLabel' : undefined}>{roleLabel(message.role)}</strong>
               {message.meta && <span>{message.meta}</span>}
             </header>
-            <div className="markdownBody">{renderMarkdown(message.content)}</div>
+            {message.role === 'user' ? (
+              <div className="userText">{message.content}</div>
+            ) : (
+              <div className="markdownBody">
+                <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS} rehypePlugins={REHYPE_PLUGINS as never}>
+                  {message.content || (message.streaming ? '' : '')}
+                </ReactMarkdown>
+                {message.streaming && <span className="streamCaret" aria-hidden="true" />}
+              </div>
+            )}
           </div>
         </article>
       ))}

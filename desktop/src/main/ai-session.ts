@@ -1,7 +1,12 @@
 import { app } from 'electron';
+import type { WebContents } from 'electron';
 import * as path from 'path';
 
 export type DesktopAiMode = 'chat' | 'agent' | 'plan';
+
+// Match the CLI default (src/chat/agent/loop.ts maxToolRounds ?? 8) so the
+// embedded desktop turn runs the same number of tool rounds as the terminal.
+export const DESKTOP_MAX_TOOL_ROUNDS = 8;
 
 export interface DesktopAiMessage {
   id?: string;
@@ -17,18 +22,36 @@ export interface DesktopAiMessageRequest {
   text?: unknown;
 }
 
+export type DesktopAiMessageStatus = 'completed' | 'awaiting_approval' | 'error';
+
 export interface DesktopAiMessageResult {
   ok: boolean;
   message?: DesktopAiMessage;
   activity?: DesktopAiActivity[];
   output?: string;
   error?: string;
+  // 'awaiting_approval' signals the renderer that the embedded turn paused on a
+  // permission_required / plan_approval_required event (also streamed over
+  // 'ai:event'); the renderer should surface the approval affordance.
+  status?: DesktopAiMessageStatus;
+}
+
+export type DesktopFileChangeOperation = 'create' | 'overwrite' | 'edit';
+
+export interface DesktopFileChange {
+  path: string;
+  operation: DesktopFileChangeOperation;
+  added?: number;
+  removed?: number;
+  changed?: number;
+  preview?: string;
 }
 
 export interface DesktopAiActivity {
   title: string;
   status: string;
   detail: string;
+  file?: DesktopFileChange;
 }
 
 interface RuntimeChatMessage {
@@ -50,6 +73,23 @@ interface RuntimeAgentEvent {
   status?: string;
   toolResultCount?: number;
   permissionCount?: number;
+  planPreview?: string;
+  contentPreview?: string;
+}
+
+// Serializable payload pushed to the renderer over the 'ai:event' channel.
+export interface DesktopAiStreamEvent {
+  sessionId: string;
+  event: RuntimeAgentEvent;
+  file?: DesktopFileChange;
+}
+
+interface RuntimeFileChangeSummary {
+  operation: DesktopFileChangeOperation;
+  filePath: string;
+  added: number;
+  removed: number;
+  changed: number;
 }
 
 interface RuntimeAgentResult {
@@ -92,6 +132,13 @@ interface RuntimeModules {
     toolNames?: string[];
     env?: NodeJS.ProcessEnv;
   }) => string;
+  computeFileChangeSummary: (input: {
+    targetPath: string;
+    newContent: string;
+    workspaceRoot: string;
+    oldString?: string;
+    newString?: string;
+  }) => RuntimeFileChangeSummary;
 }
 
 interface DesktopAiSessionState {
@@ -183,6 +230,95 @@ function activityFromAgentEvents(events: RuntimeAgentEvent[], mode: DesktopAiMod
   ];
 }
 
+// Tool names whose arguments target a file on disk and should surface diff metadata.
+const FILE_CHANGE_TOOLS = new Set(['write_file', 'edit_file', 'str_replace', 'apply_patch', 'edit_block']);
+
+function isFileChangeTool(toolName: string | undefined): boolean {
+  return typeof toolName === 'string' && FILE_CHANGE_TOOLS.has(toolName);
+}
+
+function safeParseArgs(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Locate the tool_call arguments for a given toolCallId inside the messages we already hold.
+function findToolCallArgs(messages: RuntimeChatMessage[], toolCallId: string | undefined): Record<string, unknown> | undefined {
+  if (!toolCallId) return undefined;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const calls = messages[i].tool_calls;
+    if (!calls) continue;
+    const match = calls.find((call) => call.id === toolCallId);
+    if (match) return safeParseArgs(match.function.arguments);
+  }
+  return undefined;
+}
+
+function asPathArg(args: Record<string, unknown> | undefined): string {
+  if (!args) return '';
+  const candidate = args.path ?? args.file ?? args.filePath ?? args.target;
+  return typeof candidate === 'string' ? candidate : '';
+}
+
+// Derive structured file-change metadata for write/edit tool events so the
+// renderer can render a diff. Parses the tool call arguments out of the
+// messages we already hold (no src/** changes required).
+function deriveFileChange(
+  event: RuntimeAgentEvent,
+  messages: RuntimeChatMessage[],
+  workspaceRoot: string,
+  computeFileChangeSummary?: RuntimeModules['computeFileChangeSummary'],
+): DesktopFileChange | undefined {
+  if (event.type !== 'tool_start' && event.type !== 'tool_result') return undefined;
+  if (!isFileChangeTool(event.toolName)) return undefined;
+  const args = findToolCallArgs(messages, event.toolCallId);
+  const filePath = asPathArg(args);
+  if (!filePath) return undefined;
+
+  const oldString = args && typeof args.oldString === 'string' ? args.oldString : undefined;
+  const newString = args && typeof args.newString === 'string' ? args.newString : undefined;
+  const newContent = args && typeof args.content === 'string'
+    ? args.content
+    : (newString ?? '');
+
+  if (computeFileChangeSummary) {
+    try {
+      const summary = computeFileChangeSummary({
+        targetPath: filePath,
+        newContent,
+        workspaceRoot,
+        oldString,
+        newString,
+      });
+      return {
+        path: summary.filePath || filePath,
+        operation: summary.operation,
+        added: summary.added,
+        removed: summary.removed,
+        changed: summary.changed,
+        preview: event.contentPreview,
+      };
+    } catch {
+      /* fall through to minimal metadata */
+    }
+  }
+
+  // Minimal fallback when line counts are not derivable.
+  const operation: DesktopFileChangeOperation = oldString != null ? 'edit' : 'overwrite';
+  return { path: filePath, operation, preview: event.contentPreview };
+}
+
+function attachFileChangeToActivity(activity: DesktopAiActivity[], file: DesktopFileChange | undefined): void {
+  if (!file) return;
+  const toolsActivity = activity.find((item) => item.title === 'Tools');
+  if (toolsActivity) toolsActivity.file = file;
+}
+
 function storeCompletedTurn(session: DesktopAiSessionState, turnMessages: RuntimeChatMessage[]): void {
   session.messages = turnMessages.filter((message) => message.role !== 'system');
   session.updatedAt = Date.now();
@@ -252,7 +388,7 @@ function planActivity(result: RuntimeAgentResult, events: RuntimeAgentEvent[], s
 function buildPermissionMessage(result: RuntimeAgentResult): DesktopAiMessage {
   return {
     role: 'assistant',
-    content: `Permission required for ${result.pendingToolCall?.function.name || 'tool call'}. Open the CLI terminal bridge to review and approve this tool call.`,
+    content: `Permission required for ${result.pendingToolCall?.function.name || 'tool call'} — awaiting approval. Use the mode tabs / approve buttons to allow or deny this tool call.`,
     meta: 'permission',
   };
 }
@@ -281,10 +417,24 @@ export function getDesktopAiSessionSnapshot(sessionId = 'default'): { messages: 
   };
 }
 
-export async function sendDesktopAiMessage(request: DesktopAiMessageRequest): Promise<DesktopAiMessageResult> {
+function sendStreamEvent(sender: WebContents | undefined, payload: DesktopAiStreamEvent): void {
+  if (!sender) return;
+  try {
+    if (typeof sender.isDestroyed === 'function' && sender.isDestroyed()) return;
+    sender.send('ai:event', payload);
+  } catch {
+    /* renderer went away mid-turn; streaming is best-effort */
+  }
+}
+
+export async function sendDesktopAiMessage(
+  request: DesktopAiMessageRequest,
+  sender?: WebContents,
+): Promise<DesktopAiMessageResult> {
   const runtimeDist = resolveRuntimeDist();
   const mode = resolveMode(request.mode);
-  const session = getDesktopAiSession(resolveSessionId(request.sessionId));
+  const sessionId = resolveSessionId(request.sessionId);
+  const session = getDesktopAiSession(sessionId);
   const workspaceRoot = path.resolve(__dirname, '..', '..', '..');
   rememberSeedMessages(session, request.messages);
   appendDesktopUserMessage(session, request.text);
@@ -301,6 +451,12 @@ export async function sendDesktopAiMessage(request: DesktopAiMessageRequest): Pr
     const { parseAiEnv } = require(path.join(runtimeDist, 'chat', 'config.js')) as Pick<RuntimeModules, 'parseAiEnv'>;
     const { buildProviderToolSpecs } = require(path.join(runtimeDist, 'chat', 'tools', 'registry.js')) as Pick<RuntimeModules, 'buildProviderToolSpecs'>;
     const { buildSystemPrompt } = require(path.join(runtimeDist, 'chat', 'prompt.js')) as Pick<RuntimeModules, 'buildSystemPrompt'>;
+    let computeFileChangeSummary: RuntimeModules['computeFileChangeSummary'] | undefined;
+    try {
+      ({ computeFileChangeSummary } = require(path.join(runtimeDist, 'chat', 'tools', 'fs-write.js')) as Pick<RuntimeModules, 'computeFileChangeSummary'>);
+    } catch {
+      computeFileChangeSummary = undefined;
+    }
     const settings = parseAiEnv(process.env);
     const model = resolveModelInfo(settings.activeModelId || DEFAULT_MODEL_ID, process.env);
     const tools = buildProviderToolSpecs(mode);
@@ -320,10 +476,17 @@ export async function sendDesktopAiMessage(request: DesktopAiMessageRequest): Pr
       workspaceRoot,
       mode,
       permissionMode,
-      maxToolRounds: 4,
+      maxToolRounds: DESKTOP_MAX_TOOL_ROUNDS,
       onEvent: (event) => {
         events.push(event);
-        session.activity = activityFromAgentEvents(events, mode);
+        const activity = activityFromAgentEvents(events, mode);
+        // turnMessages holds the live tool_calls runAgentTurn pushes as it runs,
+        // so we can resolve the write/edit target for diff metadata here.
+        const file = deriveFileChange(event, turnMessages, workspaceRoot, computeFileChangeSummary);
+        attachFileChangeToActivity(activity, file);
+        session.activity = activity;
+        // Push EVERY AgentTurnEvent to the renderer for live progress.
+        sendStreamEvent(sender, { sessionId, event, file });
       },
       complete: (messagesForTurn: RuntimeChatMessage[]) => chatCompleteMessage(messagesForTurn, model, tools),
     });
@@ -333,6 +496,7 @@ export async function sendDesktopAiMessage(request: DesktopAiMessageRequest): Pr
       storeSyntheticAssistantMessage(session, message);
       return {
         ok: true,
+        status: 'awaiting_approval',
         message,
         activity: permissionActivity(result, events, session, mode),
       };
@@ -343,6 +507,7 @@ export async function sendDesktopAiMessage(request: DesktopAiMessageRequest): Pr
       storeSyntheticAssistantMessage(session, message);
       return {
         ok: true,
+        status: 'awaiting_approval',
         message,
         activity: planActivity(result, events, session, mode),
       };
@@ -351,6 +516,7 @@ export async function sendDesktopAiMessage(request: DesktopAiMessageRequest): Pr
     storeCompletedTurn(session, turnMessages);
     return {
       ok: true,
+      status: 'completed',
       message: buildCompletedMessage(result),
       activity: completedActivity(result, events, session, mode),
     };
@@ -360,6 +526,7 @@ export async function sendDesktopAiMessage(request: DesktopAiMessageRequest): Pr
     session.activity = activity;
     return {
       ok: false,
+      status: 'error',
       error: message,
       message: { role: 'assistant', content: message, meta: 'error' },
       activity,

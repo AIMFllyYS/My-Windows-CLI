@@ -1,5 +1,5 @@
-import chalk from 'chalk';
 import { SelectorOption, interactiveSelect } from '../../utils/selector';
+import { renderMarkdown } from '../../utils/markdown';
 import { renderHomeHeader } from '../home';
 import { DEFAULT_GUIDE_KEY, GUIDE_CHAPTERS, getGuideChapter, renderGuideChapter } from './chapters';
 
@@ -19,8 +19,9 @@ export function getGuideChapterColorName(key: string): GuideColorName {
 }
 
 export function formatGuideChapter(key: string): string {
-  const color = getGuideChapterColorName(key);
-  return chalk[color](renderGuideChapter(key));
+  // renderGuideChapter is the markdown source-of-truth; render it as styled terminal markdown
+  // instead of tinting the raw '#'/'- ' characters with a single chalk color.
+  return renderMarkdown(renderGuideChapter(key));
 }
 
 export function getGuideMenuOptions(currentKey: string): SelectorOption[] {
@@ -45,13 +46,11 @@ function printChapter(key: string): void {
 }
 
 function printNonInteractiveMenu(currentKey: string): void {
-  console.log(chalk.gray('\n继续学习章节：'));
-  getGuideMenuOptions(currentKey).forEach((option) => {
-    console.log(chalk.gray(`- ${option.label}`));
-  });
+  const lines = ['## 继续学习章节', '', ...getGuideMenuOptions(currentKey).map((option) => `- ${option.label}`)];
+  console.log(renderMarkdown(lines.join('\n')));
 }
 
-export async function handleGuide(version = '0.6.15'): Promise<void> {
+export async function handleGuide(version = '0.7.0'): Promise<void> {
   let currentKey = DEFAULT_GUIDE_KEY;
   console.log(renderHomeHeader(version));
   printChapter(currentKey);

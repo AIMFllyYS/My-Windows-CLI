@@ -1,7 +1,8 @@
 import { ui } from './ui/theme';
 import { getGlyphMode } from './terminal-ui';
 
-const UNICODE_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+// Claude Code uses a growing-then-shrinking asterisk cycle (SpinnerGlyph.tsx: frames + reversed).
+const UNICODE_FRAMES = ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'];
 const ASCII_FRAMES = ['|', '/', '-', '\\'];
 
 export class Spinner {

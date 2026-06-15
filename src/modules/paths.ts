@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { loadConfig, saveConfig, getProjectRoot } from '../utils/config';
+import { renderMarkdown } from '../utils/markdown';
 
 // In-memory cache for project scanning (30s TTL)
 const scanCache = new Map<string, { projects: ProjectInfo[]; timestamp: number }>();
@@ -110,23 +111,27 @@ function scanProjects(projectRoot: string): ProjectInfo[] {
 export function getProjectPaths(projectRoot?: string): string {
   const root = projectRoot || getProjectRoot();
   if (!root) {
-    return chalk.yellow('  \u672a\u914d\u7f6e\u9879\u76ee\u8def\u5f84\u3002\u8fd0\u884c hi \u540e\u53ef\u7ed1\u5b9a\uff0c\u4e5f\u53ef\u4ee5\u76f4\u63a5\u56de\u8f66\u8df3\u8fc7\u3002');
+    return renderMarkdown('\u672a\u914d\u7f6e\u9879\u76ee\u8def\u5f84\u3002\u8fd0\u884c `hi` \u540e\u53ef\u7ed1\u5b9a\uff0c\u4e5f\u53ef\u4ee5\u76f4\u63a5\u56de\u8f66\u8df3\u8fc7\u3002');
   }
 
   const projects = scanProjects(root);
 
   if (projects.length === 0) {
-    return chalk.gray('  No projects found');
+    return renderMarkdown('No projects found');
   }
 
-  let output = '';
+  const md: string[] = ['## Project Paths', ''];
   for (const proj of projects) {
-    output += chalk.green(`\n  📂 ${proj.name}`);
-    output += chalk.gray(`\n     ${proj.path}`);
+    md.push(`### ${proj.name}`);
+    md.push('');
+    md.push('```text');
+    md.push(proj.path);
+    md.push('```');
     if (proj.description) {
-      output += chalk.gray(`\n     ${proj.description}`);
+      md.push(proj.description);
     }
+    md.push('');
   }
 
-  return output;
+  return renderMarkdown(md.join('\n'));
 }

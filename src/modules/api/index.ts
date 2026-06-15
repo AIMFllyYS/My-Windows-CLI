@@ -1,7 +1,7 @@
 import * as readline from 'readline';
-import chalk from 'chalk';
 import { interactiveSelect } from '../../utils/selector';
 import { openUrl } from '../../utils/open-url';
+import { renderMarkdown } from '../../utils/markdown';
 import { API_PROVIDERS, ApiProvider } from './registry';
 
 export { API_PROVIDERS };
@@ -28,32 +28,50 @@ function askEnter(): Promise<string> {
   });
 }
 
-function printLinks(provider: ApiProvider): void {
-  console.log(chalk.bold.white('\n官方链接：'));
+function linksMarkdown(provider: ApiProvider): string[] {
+  const lines: string[] = ['### 官方链接', ''];
   for (const [key, value] of Object.entries(provider.links)) {
     if (!value) continue;
-    console.log(chalk.blue(`- ${linkLabels[key] || key}: ${value}`));
+    lines.push(`- ${linkLabels[key] || key}: <${value}>`);
   }
+  lines.push('');
+  return lines;
 }
 
-function printCompatibility(provider: ApiProvider): void {
-  console.log(chalk.bold.white('\n兼容性说明：'));
-  console.log(chalk.gray(`- 原生 / 默认：${provider.compatibility.native}`));
-  console.log(chalk.gray(`- OpenAI 兼容：${provider.compatibility.openai}`));
-  console.log(chalk.gray(`- Anthropic 兼容：${provider.compatibility.anthropic}`));
+function compatibilityMarkdown(provider: ApiProvider): string[] {
+  return [
+    '### 兼容性说明',
+    '',
+    '| 协议 | 说明 |',
+    '| --- | --- |',
+    `| 原生 / 默认 | ${provider.compatibility.native.replace(/\|/g, '\\|')} |`,
+    `| OpenAI 兼容 | ${provider.compatibility.openai.replace(/\|/g, '\\|')} |`,
+    `| Anthropic 兼容 | ${provider.compatibility.anthropic.replace(/\|/g, '\\|')} |`,
+    '',
+  ];
+}
+
+function providerMarkdown(provider: ApiProvider): string {
+  const md: string[] = [
+    `## ${provider.name}`,
+    '',
+    `- 当前可证实主推模型：${provider.topModel}`,
+    `- 资料核查日期：${provider.evidenceDate}`,
+    '',
+    provider.description,
+    '',
+    ...linksMarkdown(provider),
+    ...compatibilityMarkdown(provider),
+  ];
+  if (provider.notes.length > 0) {
+    md.push('### 谨慎说明', '');
+    provider.notes.forEach((note) => md.push(`- ${note}`));
+  }
+  return md.join('\n');
 }
 
 function printProvider(provider: ApiProvider): void {
-  console.log(chalk.bold.cyan(`\n${provider.name}`));
-  console.log(chalk.white(`当前可证实主推模型：${provider.topModel}`));
-  console.log(chalk.gray(`资料核查日期：${provider.evidenceDate}`));
-  console.log(chalk.gray(provider.description));
-  printLinks(provider);
-  printCompatibility(provider);
-  if (provider.notes.length > 0) {
-    console.log(chalk.bold.white('\n谨慎说明：'));
-    provider.notes.forEach((note) => console.log(chalk.yellow(`- ${note}`)));
-  }
+  console.log(renderMarkdown(providerMarkdown(provider)));
 }
 
 export async function handleApiGuide(): Promise<void> {

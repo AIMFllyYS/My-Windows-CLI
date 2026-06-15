@@ -3,6 +3,7 @@ import * as readline from 'readline';
 import chalk from 'chalk';
 import { InstallTarget } from './types';
 import { commandForPlatform, missingRequirements } from './environment';
+import { renderMarkdown } from '../../utils/markdown';
 
 function askConfirm(message: string): Promise<boolean> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -24,31 +25,32 @@ function openUrl(url: string): void {
 }
 
 export async function runInstallTarget(target: InstallTarget, latest = false): Promise<void> {
-  console.log(chalk.bold.cyan(`\n${target.displayName}`));
-  console.log(chalk.gray(target.description));
+  const header: string[] = [`## ${target.displayName}`, '', target.description];
   if (target.notes) {
-    console.log(chalk.gray(target.notes));
+    header.push('', target.notes);
   }
-  console.log(chalk.gray(`Source: ${target.sourceUrl}`));
+  header.push('', `- Source: <${target.sourceUrl}>`);
+  console.log(renderMarkdown(header.join('\n')));
 
   if (target.opensUrlOnly) {
     const url = target.installUrl || target.sourceUrl;
-    console.log(chalk.yellow(`\nThis target opens the official page: ${url}`));
+    console.log(renderMarkdown(`This target opens the official page: <${url}>`));
     if (await askConfirm('Open it now?')) openUrl(url);
     return;
   }
 
   const missing = missingRequirements(target.requirements);
   if (missing.length > 0) {
-    console.log(chalk.yellow('\nMissing requirements:'));
+    const md: string[] = ['### Missing requirements', ''];
     for (const requirement of missing) {
-      console.log(chalk.yellow(`- ${requirement.name}: ${requirement.installHint}`));
+      md.push(`- **${requirement.name}**: ${requirement.installHint}`);
     }
+    console.log(renderMarkdown(md.join('\n')));
     return;
   }
 
   if (latest && target.versionCommand) {
-    console.log(chalk.gray(`\nCurrent version check: ${target.versionCommand}`));
+    console.log(renderMarkdown(`Current version check:\n\n\`\`\`bash\n${target.versionCommand}\n\`\`\``));
     try {
       execSync(target.versionCommand, { stdio: 'inherit' });
     } catch {
@@ -65,7 +67,7 @@ export async function runInstallTarget(target: InstallTarget, latest = false): P
     return;
   }
 
-  console.log(chalk.cyan(`\nInstall command:\n${command}`));
+  console.log(renderMarkdown(`### Install command\n\n\`\`\`bash\n${command}\n\`\`\``));
   if (await askConfirm('Run this command?')) {
     execSync(command, { stdio: 'inherit' });
   }

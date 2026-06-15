@@ -49,6 +49,8 @@ export interface SlashPromptOptions {
   output?: NodeJS.WriteStream;
   onOverlayChange?: (active: boolean) => void;
   signal?: AbortSignal;
+  // Submitted-prompt history (oldest first). Up/Down recall entries when the slash overlay is closed.
+  history?: string[];
 }
 
 function visibleCommand(item: SlashMenuItem): string {
@@ -323,6 +325,9 @@ export function promptWithSlashTypeahead(options: SlashPromptOptions): Promise<s
   const input = options.input || process.stdin;
   const output = options.output || process.stdout;
   const redrawPrompt = promptRedrawText(options.prompt);
+  const history = options.history || [];
+  let historyIndex = history.length;
+  let draft = '';
   let value = '';
   let state = createSlashTypeaheadState('', options.mode);
   let renderedSuggestionLines = 0;
@@ -390,6 +395,26 @@ export function promptWithSlashTypeahead(options: SlashPromptOptions): Promise<s
     };
 
     const onKeypress = (str: string | undefined, key: readline.Key) => {
+      // When the slash overlay is closed, Up/Down recall submitted-input history in place
+      // (overlay-open Up/Down stays bound to suggestion selection below).
+      if (!state.active && (key?.name === 'up' || key?.name === 'down')) {
+        if (key.name === 'up') {
+          if (historyIndex > 0) {
+            if (historyIndex === history.length) draft = value;
+            historyIndex -= 1;
+            value = history[historyIndex] ?? '';
+            refreshState();
+            render();
+          }
+        } else if (historyIndex < history.length) {
+          historyIndex += 1;
+          value = historyIndex === history.length ? draft : (history[historyIndex] ?? '');
+          refreshState();
+          render();
+        }
+        return;
+      }
+
       const overlayDismiss = resolveOverlayDismissKeyAction(str, key, state.active);
       if (overlayDismiss.action === 'dismiss-overlay') {
         state = dismissSlashTypeahead(state);

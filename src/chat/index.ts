@@ -52,8 +52,8 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
   const messages: ChatMessage[] = [{ role: 'system', content: buildSessionPrompt() }];
   const permissionSession: SessionPermissionMemory = {};
 
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const pendingInput = createPendingInputController();
+  const inputHistory: string[] = [];
   const ask = (): Promise<string> => pendingInput.wait((resolve) => {
     const promptAbort = new AbortController();
     activePromptAbort = promptAbort;
@@ -61,6 +61,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
       prompt: chalk.cyan('\n  ❯ '),
       mode: session.mode,
       signal: promptAbort.signal,
+      history: inputHistory,
       onOverlayChange: (active) => {
         session.inSubmenu = active;
       },
@@ -70,7 +71,18 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
     });
   });
   const askPrompt = async (prompt: string): Promise<string> => {
-    const answer = await pendingInput.wait((resolve) => rl.question(prompt, resolve));
+    // A short-lived readline interface handles modal line questions (settings, permission choices).
+    // No persistent interface stays attached to stdin, so the raw-mode prompt above never fights a
+    // hidden readline line-editor on Up/Down (which previously made the whole prompt reflow).
+    const answer = await pendingInput.wait((resolve) => {
+      const lineReader = readline.createInterface({ input: process.stdin, output: process.stdout });
+      lineReader.question(prompt, (value) => {
+        lineReader.close();
+        resolve(value);
+      });
+    });
+    process.stdin.setRawMode?.(true);
+    process.stdin.resume();
     if (shouldExit) throw new Error(AI_SESSION_EXIT);
     return answer;
   };
@@ -131,8 +143,9 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
     handleInterrupt(key?.ctrl && key.name === 'c' ? 'Ctrl+C' : 'Esc');
   };
   const wasRaw = process.stdin.isRaw;
-  readline.emitKeypressEvents(process.stdin, rl);
+  readline.emitKeypressEvents(process.stdin);
   process.stdin.setRawMode?.(true);
+  process.stdin.resume();
   process.on('SIGINT', onSigint);
   process.stdin.on('keypress', onKeypress);
   const runSearch = async (query: string, searchMessages: ChatMessage[], model: ModelInfo): Promise<void> => {
@@ -181,6 +194,7 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
     queuedInput = null;
     const input = rawInput.trim();
     if (!input) continue;
+    if (inputHistory[inputHistory.length - 1] !== input) inputHistory.push(input);
 
     // === Slash Commands ===
     if (input.startsWith('/')) {
@@ -243,7 +257,6 @@ export async function startChat(options?: string | StartChatOptions): Promise<vo
   process.removeListener('SIGINT', onSigint);
   process.stdin.removeListener('keypress', onKeypress);
   if (!wasRaw) process.stdin.setRawMode?.(false);
-  rl.close();
   }
 }
 
@@ -954,9 +967,8 @@ async function streamAgentResponse(
     }
 
     while (result.status === 'permission_required') {
-      if (messages[messages.length - 1] === result.assistantMessage) {
-        messages.pop();
-      }
+      // Keep the assistant message that requested the tool in the transcript so the upcoming
+      // tool result pairs with it (OpenAI requires every tool_call id to have a tool response).
       console.log(renderPermissionBox({
         tool: result.pendingToolCall.function.name,
         action: 'ask',

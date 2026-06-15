@@ -7,8 +7,8 @@ const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 
 test('package exposes hi command and bumps one patch version', () => {
   const [, minor, patch] = pkg.version.match(/^0\.(\d+)\.(\d+)$/).map(Number);
-  assert.equal(minor, 6);
-  assert.ok(patch >= 7);
+  assert.equal(minor, 7);
+  assert.ok(patch >= 0);
   assert.deepEqual(pkg.bin, { hi: './dist/index.js' });
 });
 

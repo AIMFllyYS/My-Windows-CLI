@@ -4,12 +4,18 @@
 
 这个项目的重点不是炫技，而是让第一次接触 CLI 的人也能知道下一步该做什么。
 
+## v0.7.0 — Claude Code 级别 UX 升级
+
+- **全面 Markdown 渲染**：所有 CLI 命令（`--state`、`--api`、`--pay`、`--install`、`--skills`、默认讲解、`--cli`、`--paths`、`--apps`）均使用基于 `marked` + `string-width` 的终端渲染引擎，支持表格、代码块、嵌套列表、引用块、中日韩字符宽度自动适配。
+- **`--ai` 模式深度对标 Claude Code**：增长星号动画（`·✢✳✶✻✽`）、品牌橙 `#d77757` + 蓝紫辅色 `#b1b9f9`；上下键历史回溯修复（不再触发全屏乱行）；`tool_call` 工具配对正确性修复（兼容真实 OpenAI-compatible 提供商）。
+- **桌面端 Claude Code 1:1 复刻**：完整 Claude 调色盘（CSS 自定义属性）、左侧「0-1 CLI」命令面板（点击按钮 GUI 式运行 `--install` 等经典指令）、实时 Agent 编排时间轴（工具行、子 Agent 泳道、权限/计划行）、文件变更差异卡片、真实流式 Markdown 消息。
+
 ## 你可以用它做什么
 
 | 命令 | 作用 |
 | --- | --- |
 | `hi` | 默认打开新手讲解模式，从 Claude Code、CLI、代理和 skills 开始入门 |
-| `hi --state` | 打开旧版状态页，查看 GitHub、项目路径、CLI 指令和常用 App |
+| `hi --state` | 打开状态页，查看 GitHub、项目路径、CLI 指令和常用 App |
 | `hi --install` | 进入安装菜单，安装 AI CLI、AI IDE 和魔法环境工具 |
 | `hi --skills` | 打开 skills 市场，安装 Superpowers 或 agent-onboarding-skill |
 | `hi --api` | 选择 GLM、Kimi、DeepSeek、OpenAI、Claude 等 API 平台并跳转 |
@@ -50,13 +56,13 @@ curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/master/scripts/in
 如果你想固定安装某个发布版本，把链接里的 `master` 换成对应 tag，例如：
 
 ```powershell
-irm https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/v0.6.15/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/v0.7.0/scripts/install.ps1 | iex
 ```
 
 macOS / Linux：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/v0.6.15/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AIMFllyYS/0-1-CLI/v0.7.0/scripts/install.sh | bash
 ```
 
 如果还没有发布 tag，就继续使用 `master` 安装最新主分支版本。
@@ -104,10 +110,8 @@ hi --skills
 ```bash
 npm install
 npm run build
-npm run test:onboarding
-npm run test:resources
-npm run test:install-registry
-npm run test:skills
+node --test --test-concurrency=1 tests/*.test.js
+npm run desktop:build
 ```
 
 ## 编码注意事项
