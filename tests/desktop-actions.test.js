@@ -189,6 +189,13 @@ test('desktop renderer mirrors cli modes and balanced shell layout', () => {
   assert.match(styles, /\.composer\s*\{/);
 });
 
+test('desktop vite build uses file-safe relative renderer assets', () => {
+  const viteConfig = read('desktop/vite.config.ts');
+
+  assert.match(viteConfig, /base:\s*['"]\.\/['"]/);
+  assert.match(viteConfig, /emptyOutDir:\s*true/);
+});
+
 test('desktop settings panel explains cli setting flow', () => {
   const renderer = read('desktop/src/renderer/App.tsx');
 

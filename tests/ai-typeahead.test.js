@@ -360,6 +360,81 @@ test('slash prompt renders mid-input ghost text without submitting it', async ()
   assert.equal(await pending, 'please /pla');
 });
 
+test('slash prompt keeps pasted urls and Chinese text single-line on narrow terminals', () => {
+  const {
+    formatPromptInputForDisplay,
+    sanitizePromptInsert,
+  } = require('../dist/chat/typeahead');
+  const { visibleLength } = require('../dist/chat/ui/theme');
+
+  const pasted = sanitizePromptInsert('第一行：https://example.com/path\r\n第二行：继续测试\t完成');
+  const rendered = formatPromptInputForDisplay(pasted, '> ', 24);
+
+  assert.equal(pasted, '第一行：https://example.com/path 第二行：继续测试 完成');
+  assert.match(rendered, /^…/);
+  assert.ok(visibleLength('> ' + rendered) <= 24, `prompt display too wide: ${rendered}`);
+  assert.match(rendered, /完成$/);
+});
+
+test('slash prompt clears suggestion rows below the prompt when moving selection', async () => {
+  const { promptWithSlashTypeahead } = require('../dist/chat/typeahead');
+  const input = new EventEmitter();
+  input.isRaw = false;
+  input.setRawMode = () => undefined;
+  input.resume = () => undefined;
+  const writes = [];
+  const output = {
+    columns: 80,
+    write: (chunk) => { writes.push(String(chunk)); },
+  };
+
+  const pending = promptWithSlashTypeahead({
+    prompt: '> ',
+    mode: 'agent',
+    input,
+    output,
+  });
+
+  input.emit('keypress', '/', { name: undefined });
+  input.emit('keypress', undefined, { name: 'down' });
+  input.emit('keypress', undefined, { name: 'down' });
+  input.emit('keypress', undefined, { name: 'return' });
+
+  await pending;
+  const rawWrites = writes.join('');
+  assert.match(rawWrites, /\x1B\[1B\r\x1B\[2K/);
+  assert.doesNotMatch(rawWrites, /\x1B\[1A\x1B\[2K/);
+});
+
+test('slash prompt redraw does not repeat a leading prompt newline on every keypress', async () => {
+  const { promptWithSlashTypeahead } = require('../dist/chat/typeahead');
+  const input = new EventEmitter();
+  input.isRaw = false;
+  input.setRawMode = () => undefined;
+  input.resume = () => undefined;
+  const writes = [];
+  const output = {
+    columns: 80,
+    write: (chunk) => { writes.push(String(chunk)); },
+  };
+
+  const pending = promptWithSlashTypeahead({
+    prompt: '\n  ❯ ',
+    mode: 'agent',
+    input,
+    output,
+  });
+
+  for (const char of 'https://example.com') {
+    input.emit('keypress', char, { name: undefined });
+  }
+  input.emit('keypress', undefined, { name: 'return' });
+
+  assert.equal(await pending, 'https://example.com');
+  const rawWrites = writes.join('');
+  assert.doesNotMatch(rawWrites, /\r\x1B\[2K\n  ❯/);
+});
+
 test('slash prompt abort cleans up keypress listener and resolves pending input', async () => {
   const { promptWithSlashTypeahead } = require('../dist/chat/typeahead');
   const input = new EventEmitter();
