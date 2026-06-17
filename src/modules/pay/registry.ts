@@ -12,4 +12,5 @@ export const PAY_RESOURCES: PayResource[] = [
   { key: 'orionkey', name: 'OrionKey 代充平台', url: 'https://www.orionkey.shop/', description: '其他相对稳定的代充平台之一。' },
   { key: 'bcai', name: 'BCAI 代充平台', url: 'https://www.bcai.store/', description: '其他相对稳定的代充平台之一。' },
   { key: 'apikey-fun', name: 'APIKey.fun AI 中转', url: 'https://apikey.fun/register?aff=N3FM3989JUX8', description: '目前在用较稳定的 AI API 中转平台。' },
+  { key: 'llm-token', name: 'LLM Token AI 中转', url: 'https://llm-token.cn/r/INV40EB01B7', description: '另一个比较靠谱的 AI API 中转平台。' },
 ];
